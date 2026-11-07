@@ -1,0 +1,127 @@
+import { useState } from "react";
+import { api, errorMessage } from "./api";
+import type { Field, FieldType, Table } from "./types";
+import { Icon } from "./icons";
+import { ErrorText, Modal } from "./ui";
+
+const TYPES: { id: FieldType; label: string }[] = [
+  { id: "text", label: "Text" },
+  { id: "number", label: "Number" },
+  { id: "boolean", label: "Checkbox" },
+  { id: "date", label: "Date" },
+  { id: "phone", label: "Phone" },
+  { id: "select", label: "Select" },
+  { id: "multi_select", label: "Multi-select" },
+  { id: "relation", label: "Relation" },
+];
+
+interface OptionRow {
+  id?: string;
+  label: string;
+}
+
+/** Creates a field, or (with `field`) renames one and edits its options. A field's type never changes. */
+export function FieldDialog(props: { tableId: string; tables: Table[]; field?: Field; onClose: () => void; onSaved: () => void }) {
+  const { field } = props;
+  const [name, setName] = useState(field?.name ?? "");
+  const [type, setType] = useState<FieldType>(field?.type ?? "text");
+  const [integer, setInteger] = useState(false);
+  const [target, setTarget] = useState(props.tables[0]?.id ?? props.tableId);
+  const [many, setMany] = useState(false);
+  const [options, setOptions] = useState<OptionRow[]>(field ? field.options.map((o) => ({ id: o.id, label: o.label })) : []);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const hasOptions = type === "select" || type === "multi_select";
+  const base = `/api/tables/${encodeURIComponent(props.tableId)}/fields`;
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const opts = options.filter((o) => o.label.trim()).map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim() }));
+    try {
+      if (field) {
+        await api.patch(`${base}/${field.id}`, { name, ...(hasOptions ? { options: opts } : {}) });
+      } else {
+        const config = type === "number" ? { integer } : type === "relation" ? { table: target, many } : {};
+        await api.post(base, { name, type, config, ...(hasOptions ? { options: opts } : {}) });
+      }
+      props.onSaved();
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={field ? `Edit ${field.name}` : "Add field"} onClose={props.onClose}>
+      <form className="form" onSubmit={save}>
+        <label>
+          Name
+          <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        {!field && (
+          <label>
+            Type
+            <select value={type} onChange={(e) => setType(e.target.value as FieldType)}>
+              {TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {!field && type === "number" && (
+          <label className="inline">
+            <input type="checkbox" checked={integer} onChange={(e) => setInteger(e.target.checked)} /> Whole numbers only
+          </label>
+        )}
+        {!field && type === "relation" && (
+          <>
+            <label>
+              Links to
+              <select value={target} onChange={(e) => setTarget(e.target.value)}>
+                {props.tables.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="inline">
+              <input type="checkbox" checked={many} onChange={(e) => setMany(e.target.checked)} /> Allow several records
+            </label>
+          </>
+        )}
+        {hasOptions && (
+          <div>
+            <div className="label" style={{ marginBottom: 6 }}>Options</div>
+            {options.map((o, i) => (
+              <div className="row" key={i}>
+                <input autoFocus={!o.id && !o.label} value={o.label} placeholder="Option" onChange={(e) => setOptions(options.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                <button type="button" className="btn ghost icon-only" onClick={() => setOptions(options.filter((_, j) => j !== i))} aria-label="Remove option">
+                  <Icon name="x" size={15} />
+                </button>
+              </div>
+            ))}
+            <button type="button" className="btn small" onClick={() => setOptions([...options, { label: "" }])}>
+              <Icon name="plus" size={14} /> Add option
+            </button>
+            {field && <p className="muted" style={{ margin: "8px 0 0", fontSize: 12.5 }}>Removing an option clears it from every record that uses it.</p>}
+          </div>
+        )}
+        <ErrorText text={error} />
+        <div className="actions">
+          <button type="button" className="btn" onClick={props.onClose}>
+            Cancel
+          </button>
+          <button className="btn primary" disabled={busy}>
+            {field ? "Save" : "Add field"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

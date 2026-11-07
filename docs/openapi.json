@@ -1,0 +1,2744 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CRM API",
+    "version": "0.1.0",
+    "description": "Everything here is under `/api`. Replace the host with wherever you run the server (default `http://127.0.0.1:3000`).\n\n## Quick start\n\n```sh\n# 1. First run only: create the admin account (this also signs you in via cookie)\ncurl -c jar -H 'content-type: application/json' -d '{\"email\":\"me@example.com\",\"password\":\"a-long-password\"}' http://127.0.0.1:3000/api/auth/register\n\n# 2. Make an API key. The key is shown once.\ncurl -b jar -H 'content-type: application/json' -d '{\"name\":\"scripts\"}' http://127.0.0.1:3000/api/api-keys\n\n# 3. Use the key\nexport KEY=crm_...\ncurl -H \"Authorization: Bearer $KEY\" -H 'content-type: application/json' -d '{\"name\":\"Companies\"}' http://127.0.0.1:3000/api/tables\ncurl -H \"Authorization: Bearer $KEY\" -H 'content-type: application/json' \\\n  -d '{\"name\":\"Stage\",\"type\":\"select\",\"options\":[{\"label\":\"Lead\"},{\"label\":\"Won\"}]}' http://127.0.0.1:3000/api/tables/Companies/fields\ncurl -H \"Authorization: Bearer $KEY\" -H 'content-type: application/json' \\\n  -d '{\"values\":{\"Name\":\"Acme\",\"Stage\":\"Lead\"}}' http://127.0.0.1:3000/api/tables/Companies/records\n```\n\nTo try calls on this page, click **Authorize** and paste an API key, or sign in to the app in this browser first (the session cookie is used automatically).\n\n## Model\n\nThere are no built-in objects. You create **tables**, add typed **fields**, and write **records**. A table URL segment accepts the table's name or ID. Record `values` accept field names (case-insensitive) or field IDs. Every table has one primary text field, `Name`.\n\nA record looks like `{\"id\", \"created_at\", \"updated_at\", \"created_by\", \"updated_by\", \"values\": {...}}`. Writes send `{\"values\": {...}}`; `POST` sets the listed fields and `PATCH` changes only the listed fields. `null` clears a field. Unknown keys are rejected.\n\n## Value formats\n\n| Field type | JSON value |\n|---|---|\n| text | string, up to 100,000 characters |\n| number | number; whole numbers only if the field has `config.integer` |\n| boolean | `true` / `false` |\n| date | `YYYY-MM-DD`, or a date-time such as `2026-03-01T09:30:00Z` |\n| phone | international number; spaces, dashes, dots and parentheses are stripped; stored as E.164 (`+14155552671`) |\n| select | option label or ID on write; the label on read |\n| multi_select | array of option labels or IDs on write; array of labels on read |\n| relation (to one) | record ID string, or `null`; the target record must exist |\n| relation (to many) | array of record IDs (no duplicates, at most 1000) |\n\n## Filters\n\nThe `filter` query parameter is URL-encoded JSON. A condition is `{\"field\", \"op\", \"value\"}`. Groups are `{\"and\": [...]}` and `{\"or\": [...]}`, nested up to 8 levels, 50 conditions in total.\n\n```json\n{\"and\": [\n  {\"field\": \"Stage\", \"op\": \"eq\", \"value\": \"Won\"},\n  {\"or\": [\n    {\"field\": \"Amount\", \"op\": \"gt\", \"value\": 100},\n    {\"field\": \"Owner\", \"op\": \"is_empty\"}\n  ]}\n]}\n```\n\nOperators by field type:\n\n| Type | Operators |\n|---|---|\n| text, phone | `eq`, `neq`, `contains`, `starts_with`, `in`, `is_empty`, `is_not_empty` |\n| number, date | `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `is_empty`, `is_not_empty` |\n| boolean | `eq`, `neq`, `is_empty`, `is_not_empty` |\n| select, relation (to one) | `eq`, `neq`, `in`, `is_empty`, `is_not_empty` |\n| multi_select, relation (to many) | `has`, `has_any`, `is_empty`, `is_not_empty` |\n\n`in` and `has_any` take an array. System columns can be filtered and sorted as `$id`, `$created_at`, `$updated_at`, `$created_by`, `$updated_by`.\n\nExample: `GET /api/tables/Companies/records?filter=%7B%22field%22%3A%22Stage%22%2C%22op%22%3A%22eq%22%2C%22value%22%3A%22Won%22%7D`\n\n## Pagination\n\n`limit` is 1 to 200 (default 50). Follow `next_cursor` until it is `null`. A cursor works only with the same `filter` and `sort`.\n\n## Errors\n\nFailures return `{\"error\": {\"code\", \"message\"}}` with status 400, 401, 403, 404 or 409."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Tables"
+    },
+    {
+      "name": "Fields"
+    },
+    {
+      "name": "Records"
+    },
+    {
+      "name": "Search"
+    },
+    {
+      "name": "Views"
+    },
+    {
+      "name": "API keys"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "System"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "sessionCookie": []
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Server is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/status": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Is first-run setup needed?",
+        "description": "True while the database has no users. Use it to choose between register and login.",
+        "responses": {
+          "200": {
+            "description": "Status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "needs_setup": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create the first account (admin)",
+        "description": "Works only while no user exists. The first user becomes admin and is signed in. Afterwards it returns 403; an admin creates accounts with `POST /api/users`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              },
+              "example": {
+                "email": "admin@example.com",
+                "password": "a-long-password"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account created. Sets the `crm_session` cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in",
+        "description": "Sets the `crm_session` cookie. Scripts should use an API key instead (see `POST /api/api-keys`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credentials"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign out",
+        "responses": {
+          "200": {
+            "description": "Session ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Current user",
+        "responses": {
+          "200": {
+            "description": "The signed-in user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "List users",
+        "description": "Admin only.",
+        "responses": {
+          "200": {
+            "description": "Users.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create a user",
+        "description": "Admin only. There is no email sending, so give the person the temporary password yourself.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "At least 8 characters."
+                  },
+                  "is_admin": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update a user",
+        "description": "Admin only. Change the password or the admin flag. The last admin cannot be demoted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  },
+                  "is_admin": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Delete a user",
+        "description": "Admin only. The last admin cannot be deleted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys": {
+      "get": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "List your API keys",
+        "description": "The key value is never shown again after creation.",
+        "responses": {
+          "200": {
+            "description": "Keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiKey"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "Create an API key",
+        "description": "The response holds the key itself. Save it now; only a hash is stored. Send it as `Authorization: Bearer <key>`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              },
+              "example": {
+                "name": "import script"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string",
+                      "example": "crm_..."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/api-keys/{id}": {
+      "delete": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "Revoke an API key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Key ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables": {
+      "get": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "List tables",
+        "responses": {
+          "200": {
+            "description": "Tables.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Table"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "Create a table",
+        "description": "Creates a real SQLite table with a primary text field named `Name`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableName"
+              },
+              "example": {
+                "name": "Companies"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}": {
+      "get": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "Get a table with its fields",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Table.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "Rename a table",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableName"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "Delete a table",
+        "description": "Soft delete: the data stays in the database, but the table disappears from the API.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/fields": {
+      "get": {
+        "tags": [
+          "Fields"
+        ],
+        "summary": "List fields",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Field"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Fields"
+        ],
+        "summary": "Add a field",
+        "description": "Adds a column (or a join table for multi-select and to-many relations).",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewField"
+              },
+              "example": {
+                "name": "Stage",
+                "type": "select",
+                "options": [
+                  {
+                    "label": "Lead",
+                    "color": "blue"
+                  },
+                  {
+                    "label": "Won",
+                    "color": "green"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Field"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/fields/{field}": {
+      "patch": {
+        "tags": [
+          "Fields"
+        ],
+        "summary": "Rename a field or change its options",
+        "description": "Type and config cannot change. For select and multi-select, `options` replaces the list: send existing options with their `id` to keep them. Options left out are removed.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "description": "Field ID or name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/OptionInput"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Field"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Fields"
+        ],
+        "summary": "Delete a field",
+        "description": "The primary field cannot be deleted.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "description": "Field ID or name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/records": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "List records",
+        "description": "Returns one page. Follow `next_cursor` until it is `null`.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Full-text search text.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "description": "URL-encoded JSON filter tree. See the Filters section above.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "{\"field\":\"Stage\",\"op\":\"eq\",\"value\":\"Won\"}"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "URL-encoded JSON array of `{field, dir}`, at most 5 keys. Not allowed on relation or multi-select fields.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "[{\"field\":\"Amount\",\"dir\":\"desc\"}]"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1 to 200.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page. Use it only with the same filter and sort.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Create a record",
+        "description": "Fields you leave out stay empty. Unknown keys are rejected.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordWrite"
+              },
+              "example": {
+                "values": {
+                  "Name": "Acme",
+                  "Stage": "Lead",
+                  "Amount": 1200,
+                  "Phone": "+1 (415) 555-2671",
+                  "Tags": [
+                    "vip",
+                    "eu"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/records/{id}": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Get a record",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Record ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Update a record",
+        "description": "Changes only the listed fields. `null` clears a field.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Record ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordWrite"
+              },
+              "example": {
+                "values": {
+                  "Name": "Acme",
+                  "Stage": "Lead",
+                  "Amount": 1200,
+                  "Phone": "+1 (415) 555-2671",
+                  "Tags": [
+                    "vip",
+                    "eu"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Delete a record",
+        "description": "Removes the row for good.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Record ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search every table",
+        "description": "Full-text search. Results are grouped by table, best match first. Tables with no match are left out.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search text. The last word matches as a prefix.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Matches per table, 1 to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 5
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TableMatches"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/views": {
+      "get": {
+        "tags": [
+          "Views"
+        ],
+        "summary": "List saved views",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Views.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/View"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Views"
+        ],
+        "summary": "Create a saved view",
+        "description": "Config may name fields; the server stores IDs, so renames keep working.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "kind"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "grid",
+                      "kanban"
+                    ]
+                  },
+                  "config": {
+                    "$ref": "#/components/schemas/ViewConfig"
+                  }
+                }
+              },
+              "example": {
+                "name": "Won deals",
+                "kind": "grid",
+                "config": {
+                  "filter": {
+                    "field": "Stage",
+                    "op": "eq",
+                    "value": "Won"
+                  },
+                  "sort": [
+                    {
+                      "field": "Amount",
+                      "dir": "desc"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tables/{table}/views/{view}": {
+      "get": {
+        "tags": [
+          "Views"
+        ],
+        "summary": "Get a view",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "View ID or name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "View.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Views"
+        ],
+        "summary": "Update a view",
+        "description": "`config` replaces the old config. `kind` cannot change.",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "View ID or name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "config": {
+                    "$ref": "#/components/schemas/ViewConfig"
+                  },
+                  "position": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/View"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Views"
+        ],
+        "summary": "Delete a view",
+        "parameters": [
+          {
+            "name": "table",
+            "in": "path",
+            "description": "Table ID or name (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "Companies"
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "View ID or name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "bad_request",
+                  "unauthorized",
+                  "forbidden",
+                  "not_found",
+                  "conflict",
+                  "internal"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "Credentials": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "SessionUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "is_admin": {
+            "type": "boolean"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "is_admin": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TableName": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "Table": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TableDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Table"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Field"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "OptionInput": {
+        "type": "object",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Set when keeping or editing an existing option."
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Option": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "integer"
+          }
+        }
+      },
+      "FieldConfig": {
+        "type": "object",
+        "properties": {
+          "integer": {
+            "type": "boolean",
+            "description": "Number fields: whole numbers only."
+          },
+          "table": {
+            "type": "string",
+            "description": "Relation fields: target table name or ID."
+          },
+          "many": {
+            "type": "boolean",
+            "description": "Relation fields: link to many records. Default false."
+          }
+        }
+      },
+      "NewField": {
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          },
+          "config": {
+            "$ref": "#/components/schemas/FieldConfig"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionInput"
+            },
+            "description": "Select and multi-select only."
+          }
+        }
+      },
+      "FieldType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "boolean",
+          "date",
+          "phone",
+          "select",
+          "multi_select",
+          "relation"
+        ]
+      },
+      "Field": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/FieldType"
+          },
+          "is_primary": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "config": {
+            "$ref": "#/components/schemas/FieldConfig"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            }
+          }
+        }
+      },
+      "RecordWrite": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "description": "Field name (case-insensitive) or field ID -> value. See Value formats above.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Record": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "RecordList": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Record"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TableMatches": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "Matched words are wrapped in « »."
+                }
+              }
+            }
+          }
+        }
+      },
+      "ViewConfig": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "description": "Same filter tree as the records `filter` parameter."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "dir": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                }
+              }
+            }
+          },
+          "hidden_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "group_by": {
+            "type": "string",
+            "description": "Kanban only: a select field."
+          }
+        }
+      },
+      "View": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "grid",
+              "kanban"
+            ]
+          },
+          "config": {
+            "$ref": "#/components/schemas/ViewConfig"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "True when the config names a field or option that no longer exists."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An API key from `POST /api/api-keys`."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "crm_session",
+        "description": "Set by login or register. Browsers send it automatically."
+      }
+    }
+  }
+}
