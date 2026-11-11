@@ -171,6 +171,8 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
       const r = await api.patch<Rec>(`${base}/records/${rec.id}`, { values: { [field.id]: value } });
       rows.setRecords((rs) => rs.map((x) => (x.id === r.id ? r : x)));
       if (field.is_primary) clearLabelCache();
+      // Linking a record can take it from another row, so refetch the rows.
+      if (field.type === "relation") rows.reload();
     });
 
   const moveCard = (rec: Rec, label: string | null) => {
@@ -242,7 +244,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
   const deleteField = (f: Field) =>
     run(async () => {
-      const ok = await confirm({ title: `Delete the field “${f.name}”?`, message: f.type === "relation" && f.config.many ? "Its values are no longer shown, and the related field in the linked table is deleted too. Views that use them will need updating." : "Its values are no longer shown. Views that use it will need updating.", confirmLabel: "Delete field", danger: true });
+      const ok = await confirm({ title: `Delete the field “${f.name}”?`, message: f.type === "relation" && f.config.related ? "Its values are no longer shown, and the related field in the linked table is deleted too. Views that use them will need updating." : "Its values are no longer shown. Views that use it will need updating.", confirmLabel: "Delete field", danger: true });
       if (!ok) return;
       await api.del(`${base}/fields/${f.id}`);
       await schemaChanged();

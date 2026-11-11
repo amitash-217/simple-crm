@@ -38,7 +38,7 @@ const OP_LABEL: Record<string, string> = {
 
 function opsFor(f: Field): string[] {
   if (f.type === "text" || f.type === "long_text" || f.type === "email" || f.type === "phone") return OPS.text;
-  if (f.type === "multi_select" || (f.type === "relation" && f.config.many)) return OPS.multi;
+  if (f.type === "multi_select" || (f.type === "relation" && (f.config.many || f.config.related))) return OPS.multi;
   if (f.type === "relation") return OPS.link;
   return OPS[f.type];
 }

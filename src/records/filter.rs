@@ -74,7 +74,7 @@ fn target<'a>(fields: &'a [FieldOut], key: &str) -> Result<Target<'a>, AppError>
         "date" => Kind::Date,
         "select" => Kind::Select,
         "multi_select" => Kind::Multi,
-        "relation" if field.many_relation() => Kind::Multi,
+        "relation" if field.in_join_table() => Kind::Multi,
         "relation" => Kind::Link,
         other => return Err(AppError::Internal(format!("unsupported field type `{other}`"))),
     };

@@ -56,7 +56,7 @@ function Cell({ field, value, onSave }: CellProps) {
           table={field.config.table ?? ""}
           many={!!field.config.many}
           chosen={Array.isArray(draft) ? (draft as string[]) : typeof draft === "string" ? [draft] : []}
-          onChange={(ids) => setDraft(field.config.many ? ids : (ids[0] ?? null))}
+          onChange={(ids) => (field.config.many ? setDraft(ids) : finish(true, ids[0] ?? null))}
           onClose={() => finish(true)}
         />
       </td>

@@ -102,6 +102,13 @@ pub struct FieldConfig {
     /// Stored on the auto-created partner: it reads the partner's join table from the other end.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reverse: Option<bool>,
+    /// Relation fields, on create only: whether the partner field holds many records (true, the default) or one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_many: Option<bool>,
+    /// Stored on relation fields: each record on the linked table can be linked from only one record of this field,
+    /// because the partner holds at most one. Setting links here moves a record away from its previous owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exclusive: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -168,9 +175,30 @@ impl FieldOut {
         }
     }
 
-    /// False for fields stored in a join table (multi-select, to-many relation) instead of a column.
+    /// The partner field on the other table, if this relation has one.
+    pub fn related_id(&self) -> Option<&str> {
+        self.config.get("related").and_then(Value::as_str)
+    }
+
+    /// True for fields stored in a join table: multi-select, to-many relations, and any relation that has a partner.
+    pub fn in_join_table(&self) -> bool {
+        self.field_type == "multi_select"
+            || (self.field_type == "relation" && (self.many_relation() || self.related_id().is_some()))
+    }
+
+    /// A relation in a join table that holds at most one record: its value is an ID or `null`, not an array.
+    pub fn single_link(&self) -> bool {
+        self.field_type == "relation" && !self.many_relation() && self.in_join_table()
+    }
+
+    /// Each linked record can belong to only one record of this field.
+    pub fn exclusive(&self) -> bool {
+        self.config.get("exclusive").and_then(Value::as_bool) == Some(true)
+    }
+
+    /// False for fields stored in a join table instead of a column.
     pub fn has_column(&self) -> bool {
-        self.field_type != "multi_select" && !self.many_relation()
+        !self.in_join_table()
     }
 }
 
@@ -181,9 +209,13 @@ pub struct NewField {
     pub options: Option<Vec<OptionInput>>,
 }
 
+#[derive(Default)]
 pub struct FieldPatch {
     pub name: Option<String>,
     pub options: Option<Vec<OptionInput>>,
+    /// A new type, or the same type with new `integer` / `time` settings.
+    pub field_type: Option<String>,
+    pub config: Option<FieldConfig>,
 }
 
 /// Returns `sql_name` double-quoted for use in SQL text, after checking it is one of our generated identifiers.
@@ -503,6 +535,15 @@ fn sync_options(
 }
 
 /// Creates what stores the field's values: a column, or a join table for multi-select and to-many relations.
+struct Links {
+    /// A join table, not a column.
+    joined: bool,
+    /// Each record of this table links at most one record.
+    one_per_record: bool,
+    /// Each linked record is linked from at most one record of this table.
+    one_per_target: bool,
+}
+
 fn create_storage(
     tx: &Transaction,
     table: &Table,
@@ -510,27 +551,34 @@ fn create_storage(
     field_type: FieldType,
     config: &FieldConfig,
     target: Option<&Table>,
+    links: &Links,
 ) -> Result<(), AppError> {
     let (t, f) = (ident(&table.sql_name)?, ident(field_sql)?);
-    let join = |other_column: &str, other_ref: &str| -> Result<String, AppError> {
-        // The index name reuses the field's hex ID, so it is as safe as the other identifiers.
+    let join = |other_column: &str, other_ref: &str, unique_other: bool| -> Result<String, AppError> {
+        // The index names reuse the field's hex ID, so they are as safe as the other identifiers.
         let index = ident(&format!("i_{}", &field_sql[2..]))?;
-        Ok(format!(
+        let unique = if unique_other { "UNIQUE " } else { "" };
+        let mut sql = format!(
             "CREATE TABLE {f} (
                 record_id TEXT NOT NULL REFERENCES {t}(id) ON DELETE CASCADE,
                 {other_column} TEXT NOT NULL REFERENCES {other_ref} ON DELETE CASCADE,
                 position INTEGER NOT NULL,
                 PRIMARY KEY (record_id, {other_column})
             ) WITHOUT ROWID;
-            CREATE INDEX {index} ON {f}({other_column});"
-        ))
+            CREATE {unique}INDEX {index} ON {f}({other_column});"
+        );
+        if links.one_per_record && other_column == "target_id" {
+            let own = ident(&format!("u_{}", &field_sql[2..]))?;
+            sql.push_str(&format!("CREATE UNIQUE INDEX {own} ON {f}(record_id);"));
+        }
+        Ok(sql)
     };
     match (field_type, target) {
-        (FieldType::MultiSelect, _) => tx.execute_batch(&join("option_id", "field_options(id)")?)?,
+        (FieldType::MultiSelect, _) => tx.execute_batch(&join("option_id", "field_options(id)", false)?)?,
         (FieldType::Relation, Some(target)) => {
             let target_ref = format!("{}(id)", ident(&target.sql_name)?);
-            if config.many == Some(true) {
-                tx.execute_batch(&join("target_id", &target_ref)?)?;
+            if links.joined {
+                tx.execute_batch(&join("target_id", &target_ref, links.one_per_target)?)?;
             } else {
                 // A new column with a REFERENCES clause must default to NULL, which is the default here.
                 tx.execute_batch(&format!(
@@ -553,11 +601,11 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
     if new.config.integer.is_some() && field_type != FieldType::Number {
         return Err(AppError::BadRequest("`integer` applies only to number fields".into()));
     }
-    if new.config.related.is_some() || new.config.reverse.is_some() {
-        return Err(AppError::BadRequest("`related` and `reverse` are set by the server".into()));
+    if new.config.related.is_some() || new.config.reverse.is_some() || new.config.exclusive.is_some() {
+        return Err(AppError::BadRequest("`related`, `reverse` and `exclusive` are set by the server".into()));
     }
-    if new.config.create_related.is_some() && field_type != FieldType::Relation {
-        return Err(AppError::BadRequest("`create_related` applies only to relation fields".into()));
+    if (new.config.create_related.is_some() || new.config.related_many.is_some()) && field_type != FieldType::Relation {
+        return Err(AppError::BadRequest("`create_related` and `related_many` apply only to relation fields".into()));
     }
     if new.config.time.is_some() && field_type != FieldType::Date {
         return Err(AppError::BadRequest("`time` applies only to date fields".into()));
@@ -577,17 +625,9 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
 
     let id = new_id();
     let many = new.config.many == Some(true);
-    // The SQL name says what stores the values: a column (f), a multi-select join table (m), or a relation join table (r).
-    let prefix = match field_type {
-        FieldType::MultiSelect => "m",
-        FieldType::Relation if many => "r",
-        _ => "f",
-    };
-    let field_sql = sql_name(prefix, &id);
-
     // For a relation, store the target's ID, so renaming the target table does not break the link.
     let mut stored = FieldConfig { integer: new.config.integer, time: new.config.time, ..Default::default() };
-    let mut partner: Option<(String, Table)> = None;
+    let mut partner: Option<(String, Table, bool)> = None;
     let mut target = None;
     if field_type == FieldType::Relation {
         let key = new
@@ -600,25 +640,38 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
             other => other,
         })?;
         let wants_partner = match new.config.create_related {
-            Some(true) if !many || found.id == table.id => {
-                return Err(AppError::BadRequest(
-                    "`create_related` needs a to-many relation to a different table".into(),
-                ))
+            Some(true) if found.id == table.id => {
+                return Err(AppError::BadRequest("`create_related` needs a relation to a different table".into()))
             }
             Some(want) => want,
-            None => many && found.id != table.id,
+            None => (many || new.config.related_many.is_some()) && found.id != table.id,
         };
+        if !wants_partner && new.config.related_many.is_some() {
+            return Err(AppError::BadRequest("`related_many` needs a related field".into()));
+        }
         stored.table = Some(found.id.clone());
         stored.many = Some(many);
         if wants_partner {
             let partner_id = new_id();
+            let related_many = new.config.related_many.unwrap_or(true);
             stored.related = Some(partner_id.clone());
-            partner = Some((partner_id, found.clone()));
+            // If the partner holds at most one record, each record here can be linked from only one of its records.
+            stored.exclusive = (!related_many).then_some(true);
+            partner = Some((partner_id, found.clone(), related_many));
         }
         target = Some(found);
     }
 
-    create_storage(&tx, &table, &field_sql, field_type, &new.config, target.as_ref())?;
+    // The SQL name says what stores the values: a column (f), a multi-select join table (m), or a relation join table (r).
+    let joined = field_type == FieldType::Relation && (many || partner.is_some());
+    let prefix = match field_type {
+        FieldType::MultiSelect => "m",
+        FieldType::Relation if joined => "r",
+        _ => "f",
+    };
+    let field_sql = sql_name(prefix, &id);
+    let links = Links { joined, one_per_record: joined && !many, one_per_target: stored.exclusive == Some(true) };
+    create_storage(&tx, &table, &field_sql, field_type, &new.config, target.as_ref(), &links)?;
     let config = serde_json::to_string(&stored).map_err(|e| AppError::Internal(e.to_string()))?;
     tx.execute(
         &format!(
@@ -628,7 +681,7 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
         ),
         params![id, table.id, name, field_sql, field_type.as_str(), config],
     )?;
-    if let Some((partner_id, other)) = &partner {
+    if let Some((partner_id, other, related_many)) = &partner {
         // The partner has no storage of its own: it reads this field's join table from the other end.
         let mut label = table.name.clone();
         let mut n = 1;
@@ -638,9 +691,10 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
         }
         let back = FieldConfig {
             table: Some(table.id.clone()),
-            many: Some(true),
+            many: Some(*related_many),
             related: Some(id.clone()),
             reverse: Some(true),
+            exclusive: (!many).then_some(true),
             ..Default::default()
         };
         tx.execute(
@@ -699,9 +753,162 @@ pub fn update_field(
         sync_options(&tx, &table.sql_name, &field.id, &field.sql_name, clears_column, &field.options, options)?;
     }
 
+    if patch.field_type.is_some() || patch.config.is_some() {
+        change_type(&tx, &table, &field, patch.field_type.as_deref(), patch.config.as_ref())?;
+    }
+
     let updated = resolve_field(&tx, &table.id, &field.id)?;
     tx.commit()?;
     Ok(updated)
+}
+
+const TEXT_LIKE: [&str; 4] = ["text", "long_text", "email", "phone"];
+
+/// Converts one stored value for a new field type. Everything goes through its text form.
+fn convert(from: &FieldOut, to: FieldType, config: &FieldConfig, v: rusqlite::types::Value) -> Result<rusqlite::types::Value, String> {
+    use rusqlite::types::Value as Sql;
+    let text = match v {
+        Sql::Null | Sql::Blob(_) => return Ok(Sql::Null),
+        Sql::Integer(i) => i.to_string(),
+        Sql::Real(f) => f.to_string(),
+        Sql::Text(s) if from.field_type == "select" => match from.options.iter().find(|o| o.id == s) {
+            Some(o) => o.label.clone(),
+            None => return Ok(Sql::Null),
+        },
+        Sql::Text(s) => s,
+    };
+    use crate::records::value as v;
+    match to {
+        FieldType::Text if text.chars().count() > 100_000 => Err("text is longer than 100000 characters".into()),
+        FieldType::Text | FieldType::LongText => Ok(Sql::Text(text)),
+        FieldType::Email if v::valid_email(&text) => Ok(Sql::Text(text.trim().to_string())),
+        FieldType::Email => Err(format!("`{text}` is not an email address")),
+        FieldType::Phone => v::normalize_phone(&text).map(Sql::Text).map_err(|m| format!("`{text}`: {m}")),
+        FieldType::Date if v::valid_date(&text) => Ok(Sql::Text(text)),
+        FieldType::Date => Err(format!("`{text}` is not an ISO 8601 date")),
+        FieldType::Number => {
+            let f: f64 = text.trim().parse().map_err(|_| format!("`{text}` is not a number"))?;
+            if !f.is_finite() {
+                return Err(format!("`{text}` is not a number"));
+            }
+            if config.integer == Some(true) {
+                if f.fract() != 0.0 || f.abs() >= 9.0e18 {
+                    return Err(format!("`{text}` is not a whole number"));
+                }
+                Ok(Sql::Integer(f as i64))
+            } else {
+                Ok(Sql::Real(f))
+            }
+        }
+        _ => Err("unsupported conversion".into()),
+    }
+}
+
+/// Changes a field's type, or its `integer` / `time` setting. The values move into a new column, so nothing
+/// is lost if a value does not convert: the whole change is refused and rolled back instead.
+fn change_type(
+    tx: &Transaction,
+    table: &Table,
+    field: &FieldOut,
+    new_type: Option<&str>,
+    new_config: Option<&FieldConfig>,
+) -> Result<(), AppError> {
+    let to = match new_type {
+        Some(s) => FieldType::parse(s)?,
+        None => FieldType::parse(field.field_type)?,
+    };
+    let mut cfg = FieldConfig::default();
+    if let Some(given) = new_config {
+        if given.table.is_some() || given.many.is_some() || given.create_related.is_some() || given.related_many.is_some()
+            || given.related.is_some() || given.reverse.is_some() || given.exclusive.is_some()
+        {
+            return Err(AppError::BadRequest("only `integer` and `time` can be changed in a field's config".into()));
+        }
+        if given.integer.is_some() && to != FieldType::Number {
+            return Err(AppError::BadRequest("`integer` applies only to number fields".into()));
+        }
+        if given.time.is_some() && to != FieldType::Date {
+            return Err(AppError::BadRequest("`time` applies only to date fields".into()));
+        }
+        cfg.integer = given.integer;
+        cfg.time = given.time;
+    } else {
+        // Keep the settings that still make sense for the type.
+        cfg.integer = (to == FieldType::Number).then(|| field.config.get("integer").and_then(Value::as_bool)).flatten();
+        cfg.time = (to == FieldType::Date).then(|| field.config.get("time").and_then(Value::as_bool)).flatten();
+    }
+    let same_type = to.as_str() == field.field_type;
+    let old_integer = field.config.get("integer").and_then(Value::as_bool) == Some(true);
+    let old_time = field.config.get("time").and_then(Value::as_bool) == Some(true);
+    if same_type && (cfg.integer == Some(true)) == old_integer && (cfg.time == Some(true)) == old_time {
+        return Ok(());
+    }
+    let json = serde_json::to_string(&cfg).map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Showing or hiding the time of day changes only how the value is displayed.
+    if same_type && to == FieldType::Date {
+        tx.execute("UPDATE fields SET config_json = ?1 WHERE id = ?2", params![json, field.id])?;
+        return Ok(());
+    }
+
+    let from_ok = TEXT_LIKE.contains(&field.field_type) || matches!(field.field_type, "number" | "date" | "select");
+    let to_ok = TEXT_LIKE.contains(&to.as_str()) || matches!(to, FieldType::Number | FieldType::Date);
+    if !from_ok || !to_ok {
+        return Err(AppError::BadRequest(format!(
+            "cannot change a {} field to {}",
+            field.field_type.replace('_', " "),
+            to.as_str().replace('_', " ")
+        )));
+    }
+    if field.is_primary && !TEXT_LIKE.contains(&to.as_str()) {
+        return Err(AppError::BadRequest("the primary field must stay a text, long text, email or phone field".into()));
+    }
+
+    let (t, old_col) = (ident(&table.sql_name)?, ident(&field.sql_name)?);
+    let new_sql = sql_name("f", &new_id());
+    let new_col = ident(&new_sql)?;
+    tx.execute_batch(&format!("ALTER TABLE {t} ADD COLUMN {new_col} {}", to.column_type(&cfg)))?;
+
+    let rows: Vec<(String, rusqlite::types::Value)> = {
+        let mut stmt = tx.prepare(&format!("SELECT id, {old_col} FROM {t}"))?;
+        let mapped = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        mapped.collect::<Result<_, _>>()?
+    };
+    let (mut bad, mut first) = (0usize, String::new());
+    let mut converted = Vec::new();
+    for (id, v) in rows {
+        match convert(field, to, &cfg, v) {
+            Ok(rusqlite::types::Value::Null) => {}
+            Ok(v) => converted.push((id, v)),
+            Err(e) => {
+                bad += 1;
+                if first.is_empty() {
+                    first = e;
+                }
+            }
+        }
+    }
+    if bad > 0 {
+        return Err(AppError::BadRequest(format!(
+            "{bad} value{} cannot be converted to {}: {first}. Fix or clear them first.",
+            if bad == 1 { "" } else { "s" },
+            to.as_str().replace('_', " ")
+        )));
+    }
+    for (id, v) in converted {
+        tx.execute(&format!("UPDATE {t} SET {new_col} = ?1 WHERE id = ?2"), params![v, id])?;
+    }
+    tx.execute(
+        "UPDATE fields SET type = ?1, sql_name = ?2, config_json = ?3 WHERE id = ?4",
+        params![to.as_str(), new_sql, json, field.id],
+    )?;
+    if field.field_type == "select" {
+        tx.execute("DELETE FROM field_options WHERE field_id = ?1", [&field.id])?;
+    }
+    if TEXT_LIKE.contains(&field.field_type) || TEXT_LIKE.contains(&to.as_str()) {
+        search::rebuild_index(tx, table, &read_fields(tx, &table.id)?)?;
+    }
+    Ok(())
 }
 
 /// Soft delete: the SQL column and its data stay in the file. The primary field cannot be deleted.
@@ -919,6 +1126,7 @@ mod tests {
                 OptionInput { id: Some(won.clone()), label: "Closed won".into(), color: None },
                 option("Stalled"),
             ]),
+           ..Default::default()
         };
         let updated = db.write(move |c| update_field(c, "Deals", "Stage", patch)).await.unwrap();
         let labels: Vec<&str> = updated.options.iter().map(|o| o.label.as_str()).collect();
@@ -947,6 +1155,8 @@ mod tests {
         let unknown = FieldPatch {
             name: None,
             options: Some(vec![OptionInput { id: Some("nope".into()), label: "x".into(), color: None }]),
+
+            ..Default::default()
         };
         assert!(matches!(
             db.write(|c| update_field(c, "Deals", "Stage", unknown)).await,
@@ -958,6 +1168,8 @@ mod tests {
                 OptionInput { id: Some(id.clone()), label: "a".into(), color: None },
                 OptionInput { id: Some(id), label: "b".into(), color: None },
             ]),
+
+            ..Default::default()
         };
         assert!(matches!(
             db.write(|c| update_field(c, "Deals", "Stage", repeated)).await,
@@ -972,7 +1184,7 @@ mod tests {
         let amount = db.write(|c| add_field(c, "Deals", new_field("Amount", "number"))).await.unwrap();
 
         let renamed = db
-            .write(|c| update_field(c, "Deals", "Amount", FieldPatch { name: Some("Value".into()), options: None }))
+            .write(|c| update_field(c, "Deals", "Amount", FieldPatch { name: Some("Value".into()), ..Default::default() }))
             .await
             .unwrap();
         assert_eq!(renamed.name, "Value");

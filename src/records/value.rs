@@ -88,6 +88,12 @@ pub fn to_links(field: &FieldOut, v: &Value) -> Result<Vec<String>, AppError> {
     if v.is_null() {
         return Ok(Vec::new());
     }
+    if field.single_link() {
+        return match v.as_str() {
+            Some(id) if !id.is_empty() => Ok(vec![id.to_string()]),
+            _ => Err(bad("expected a record id")),
+        };
+    }
     let items = v.as_array().ok_or_else(|| bad("expected an array"))?;
     if items.len() > MAX_LINKS {
         return Err(bad(&format!("at most {MAX_LINKS} values")));

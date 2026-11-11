@@ -14,7 +14,7 @@ export interface Field {
   is_primary: boolean;
   position: number;
   // number: { integer }, relation: { table, many }, date: { time }
-  config: { integer?: boolean; table?: string; many?: boolean; time?: boolean };
+  config: { integer?: boolean; table?: string; many?: boolean; time?: boolean; related?: string; exclusive?: boolean };
   options: Option[];
 }
 

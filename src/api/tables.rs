@@ -46,6 +46,9 @@ struct NewFieldBody {
 struct FieldPatchBody {
     name: Option<String>,
     options: Option<Vec<OptionInput>>,
+    #[serde(rename = "type")]
+    field_type: Option<String>,
+    config: Option<FieldConfig>,
 }
 
 async fn list(_: AuthUser, State(state): State<AppState>) -> Result<Json<Vec<Table>>, AppError> {
@@ -117,7 +120,7 @@ async fn update_field(
     Path((table, field)): Path<(String, String)>,
     ApiJson(body): ApiJson<FieldPatchBody>,
 ) -> Result<Json<FieldOut>, AppError> {
-    let patch = FieldPatch { name: body.name, options: body.options };
+    let patch = FieldPatch { name: body.name, options: body.options, field_type: body.field_type, config: body.config };
     Ok(Json(state.db.write(move |c| catalog::update_field(c, &table, &field, patch)).await?))
 }
 

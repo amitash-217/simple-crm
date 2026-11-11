@@ -4,7 +4,7 @@
 //! a join table instead, so they are written and read in separate statements.
 
 mod filter;
-mod value;
+pub(crate) mod value;
 
 use std::collections::{HashMap, HashSet};
 
@@ -134,6 +134,12 @@ fn write_links(tx: &Transaction, record_id: &str, assigned: &[(&FieldOut, Cell)]
         let join = ident(&field.sql_name)?;
         let (own, other) = field.link_columns();
         tx.execute(&format!("DELETE FROM {join} WHERE {own} = ?1"), [record_id])?;
+        if field.exclusive() {
+            // Each of these records may be linked from only one record, so it moves here from its old owner.
+            for id in ids {
+                tx.execute(&format!("DELETE FROM {join} WHERE {other} = ?1 AND {own} != ?2"), params![id, record_id])?;
+            }
+        }
         for (position, id) in ids.iter().enumerate() {
             tx.execute(
                 &format!("INSERT INTO {join} ({own}, {other}, position) VALUES (?1, ?2, ?3)"),
@@ -224,7 +230,12 @@ fn assemble(fields: &[FieldOut], raw: Raw, links: &Links) -> Record {
         let v = if field.has_column() {
             cells.next().unwrap_or(Value::Null)
         } else {
-            Value::Array(links.get(&field.id).and_then(|per| per.get(&id)).cloned().unwrap_or_default())
+            let mut linked = links.get(&field.id).and_then(|per| per.get(&id)).cloned().unwrap_or_default();
+            if field.single_link() {
+                if linked.is_empty() { Value::Null } else { linked.swap_remove(0) }
+            } else {
+                Value::Array(linked)
+            }
         };
         values.insert(field.name.clone(), v);
     }

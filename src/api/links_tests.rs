@@ -486,11 +486,84 @@ async fn the_partner_field_is_optional_and_never_made_for_self_links() {
     assert_eq!(fields.body.as_array().unwrap().len(), 3);
 
     for config in [
-        json!({ "table": "Projects", "create_related": true }),
+        json!({ "table": "Projects", "create_related": false, "related_many": true }),
         json!({ "table": "Companies", "many": true, "create_related": true }),
         json!({ "table": "Projects", "many": true, "related": "x" }),
     ] {
         let r = env.field("Companies", json!({ "name": "Bad", "type": "relation", "config": config })).await;
         assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
     }
+}
+
+#[tokio::test]
+async fn relations_can_be_one_to_one_one_to_many_or_many_to_one() {
+    let crm = crm().await;
+    let env = &crm.env;
+    let a = &crm.a;
+    let b = &crm.b;
+
+    // One to many: a company has many projects, each project has one company.
+    let r = env
+        .field("Companies", json!({ "name": "Work", "type": "relation", "config": { "table": "Projects", "many": true, "related_many": false } }))
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.body);
+    let r = env.patch("Companies", a, json!({ "Work": [crm.p[0], crm.p[1]] })).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    // The project side is a single value, not an array.
+    assert_eq!(env.get("Projects", &crm.p[0]).await["values"]["Companies"], a.as_str());
+    // Linking a project to another company moves it.
+    env.patch("Companies", b, json!({ "Work": [crm.p[1]] })).await;
+    assert_eq!(env.get("Companies", a).await["values"]["Work"], json!([crm.p[0]]));
+    assert_eq!(env.get("Projects", &crm.p[1]).await["values"]["Companies"], b.as_str());
+    // Setting it from the single side works too, and must be a record id.
+    env.patch("Projects", &crm.p[2], json!({ "Companies": a })).await;
+    assert_eq!(env.get("Companies", a).await["values"]["Work"], json!([crm.p[0], crm.p[2]]));
+    let bad = env.patch("Projects", &crm.p[2], json!({ "Companies": [a] })).await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST, "{}", bad.body);
+    env.patch("Projects", &crm.p[2], json!({ "Companies": null })).await;
+    assert_eq!(env.get("Companies", a).await["values"]["Work"], json!([crm.p[0]]));
+
+    // One to one: both sides hold one record, and a record moves when it is linked again.
+    let r = env
+        .field("Companies", json!({ "name": "Lead", "type": "relation", "config": { "table": "People", "related_many": false } }))
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.body);
+    let ann = env.add("People", json!({ "Name": "Ann" })).await;
+    env.patch("Companies", a, json!({ "Lead": ann })).await;
+    assert_eq!(env.get("People", &ann).await["values"]["Companies"], a.as_str());
+    env.patch("Companies", b, json!({ "Lead": ann })).await;
+    assert_eq!(env.get("Companies", a).await["values"]["Lead"], Value::Null);
+    assert_eq!(env.get("Companies", b).await["values"]["Lead"], ann.as_str());
+
+    // Filters work on single links.
+    let hit = env.list("Companies", Some(cond("Lead", "has", json!(ann))), None, None, None).await;
+    assert_eq!(names(&hit), ["Beta"]);
+}
+
+#[tokio::test]
+async fn a_field_can_change_type_when_its_values_convert() {
+    let crm = crm().await;
+    let env = &crm.env;
+    let r = env.field("Companies", json!({ "name": "Code", "type": "text" })).await;
+    let field = r.body["id"].as_str().unwrap().to_string();
+    env.patch("Companies", &crm.a, json!({ "Code": "42" })).await;
+    let url = format!("/api/tables/Companies/fields/{field}");
+
+    let r = env.call(Method::PATCH, &url, Some(json!({ "type": "number" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body["type"], "number");
+    assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], json!(42.0));
+
+    // Back to text, then to email: "42" is not an address, so nothing changes.
+    env.call(Method::PATCH, &url, Some(json!({ "type": "text" }))).await;
+    assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], "42");
+    let r = env.call(Method::PATCH, &url, Some(json!({ "type": "email" }))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
+    assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], "42");
+
+    // Unsupported conversions and the primary field are refused.
+    let r = env.call(Method::PATCH, "/api/tables/Companies/fields/Name", Some(json!({ "type": "number" }))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
+    let r = env.call(Method::PATCH, "/api/tables/People/fields/Skills", Some(json!({ "type": "text" }))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
 }

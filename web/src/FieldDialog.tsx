@@ -22,21 +22,28 @@ interface OptionRow {
   label: string;
 }
 
-/** Creates a field, or (with `field`) renames one and edits its options. A field's type never changes. */
+/** Types a value can be converted between. Select converts to the others, but not back. */
+const CONVERTIBLE: FieldType[] = ["text", "long_text", "email", "phone", "number", "date"];
+
+/** Creates a field, or (with `field`) edits its name, options, settings and type. */
 export function FieldDialog(props: { tableId: string; tables: Table[]; field?: Field; onClose: () => void; onSaved: () => void }) {
   const { field } = props;
   const [name, setName] = useState(field?.name ?? "");
   const [type, setType] = useState<FieldType>(field?.type ?? "text");
-  const [integer, setInteger] = useState(false);
-  const [target, setTarget] = useState(props.tables[0]?.id ?? props.tableId);
+  const [integer, setInteger] = useState(!!field?.config.integer);
+  const [target, setTarget] = useState((props.tables.find((t) => t.id !== props.tableId) ?? props.tables[0])?.id ?? props.tableId);
   const [many, setMany] = useState(true);
   const [related, setRelated] = useState(true);
-  const [time, setTime] = useState(false);
+  const [time, setTime] = useState(!!field?.config.time);
   const [options, setOptions] = useState<OptionRow[]>(field ? field.options.map((o) => ({ id: o.id, label: o.label })) : []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const hasOptions = type === "select" || type === "multi_select";
+  const canChangeType = !!field && (CONVERTIBLE.includes(field.type) || field.type === "select");
+  const typeChanged = !!field && type !== field.type;
+  const otherName = props.tables.find((t) => t.id === target)?.name ?? "the other table";
+  const selfLink = target === props.tableId;
   const base = `/api/tables/${encodeURIComponent(props.tableId)}/fields`;
 
   const save = async (e: React.FormEvent) => {
@@ -46,9 +53,15 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
     const opts = options.filter((o) => o.label.trim()).map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim() }));
     try {
       if (field) {
-        await api.patch(`${base}/${field.id}`, { name, ...(hasOptions ? { options: opts } : {}) });
+        const settings = type === "number" ? { config: { integer } } : type === "date" ? { config: { time } } : {};
+        await api.patch(`${base}/${field.id}`, {
+          name,
+          ...(hasOptions ? { options: opts } : {}),
+          ...(typeChanged ? { type } : {}),
+          ...(type === field.type && type !== "number" && type !== "date" ? {} : settings),
+        });
       } else {
-        const config = type === "number" ? { integer } : type === "relation" ? { table: target, many: many || related, create_related: related && target !== props.tableId } : type === "date" ? { time } : {};
+        const config = type === "number" ? { integer } : type === "relation" ? (related && !selfLink ? { table: target, many, related_many: true, create_related: true } : { table: target, many, create_related: false }) : type === "date" ? { time } : {};
         await api.post(base, { name, type, config, ...(hasOptions ? { options: opts } : {}) });
       }
       props.onSaved();
@@ -65,11 +78,14 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
           Name
           <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        {!field && (
+        {(!field || canChangeType) && (
           <label>
             Type
-            <select value={type} onChange={(e) => setType(e.target.value as FieldType)}>
-              {TYPES.map((t) => (
+            <select value={type} onChange={(e) => {
+                setType(e.target.value as FieldType);
+                setError("");
+              }}>
+              {TYPES.filter((t) => !field || CONVERTIBLE.includes(t.id) || t.id === field.type).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.label}
                 </option>
@@ -77,12 +93,23 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
             </select>
           </label>
         )}
-        {!field && type === "number" && (
+        {field && !canChangeType && (
+          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+            Type: {TYPES.find((t) => t.id === field.type)?.label}. Checkbox, multi-select and relation fields can&apos;t change type.
+          </p>
+        )}
+        {typeChanged && (
+          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+            Existing values are converted. If any value doesn&apos;t fit the new type, nothing changes and you&apos;ll see which one.
+            {field?.type === "select" && " The select's options are removed."}
+          </p>
+        )}
+        {type === "number" && (
           <label className="inline">
             <input type="checkbox" checked={integer} onChange={(e) => setInteger(e.target.checked)} /> Whole numbers only
           </label>
         )}
-        {!field && type === "date" && (
+        {type === "date" && (
           <label className="inline">
             <input type="checkbox" checked={time} onChange={(e) => setTime(e.target.checked)} /> Include time
           </label>
@@ -99,19 +126,13 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
                 ))}
               </select>
             </label>
-            {target !== props.tableId && (
+            {!selfLink && (
               <label className="inline">
-                <input type="checkbox" checked={related} onChange={(e) => setRelated(e.target.checked)} /> Create related field in the linked table
+                <input type="checkbox" checked={related} onChange={(e) => setRelated(e.target.checked)} /> Create related field in {otherName}
               </label>
             )}
             <label className="inline">
-              <input
-                type="checkbox"
-                checked={many || (related && target !== props.tableId)}
-                disabled={related && target !== props.tableId}
-                onChange={(e) => setMany(e.target.checked)}
-              />{" "}
-              Allow several records
+              <input type="checkbox" checked={many} onChange={(e) => setMany(e.target.checked)} /> Allow multiple relationships
             </label>
           </>
         )}
