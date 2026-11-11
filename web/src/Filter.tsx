@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RelationInput } from "./FieldInput";
+import { RelationInput, fromLocalInput, toLocalInput } from "./FieldInput";
 import { Icon } from "./icons";
 import type { Field, Sort } from "./types";
 
@@ -37,7 +37,7 @@ const OP_LABEL: Record<string, string> = {
 };
 
 function opsFor(f: Field): string[] {
-  if (f.type === "text" || f.type === "phone") return OPS.text;
+  if (f.type === "text" || f.type === "long_text" || f.type === "email" || f.type === "phone") return OPS.text;
   if (f.type === "multi_select" || (f.type === "relation" && f.config.many)) return OPS.multi;
   if (f.type === "relation") return OPS.link;
   return OPS[f.type];
@@ -143,7 +143,11 @@ function ValueInput({ field, value, onChange }: { field: Field; value: unknown; 
     case "number":
       return <input type="number" value={(value as number | undefined) ?? ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />;
     case "date":
-      return <input type="date" value={(value as string | undefined) ?? ""} onChange={(e) => onChange(e.target.value || undefined)} />;
+      return field.config.time ? (
+        <input type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value) ?? undefined)} />
+      ) : (
+        <input type="date" value={(value as string | undefined)?.slice(0, 10) ?? ""} onChange={(e) => onChange(e.target.value || undefined)} />
+      );
     case "boolean":
       return (
         <select value={value === undefined ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "true")}>

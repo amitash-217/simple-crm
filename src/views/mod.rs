@@ -113,7 +113,7 @@ pub fn normalize(fields: &[FieldOut], kind: Kind, raw: &Value) -> Result<Value, 
     let obj = raw
         .as_object()
         .ok_or_else(|| AppError::BadRequest("view config must be a JSON object".into()))?;
-    if let Some(extra) = obj.keys().find(|k| !matches!(k.as_str(), "filter" | "sort" | "hidden_fields" | "group_by")) {
+    if let Some(extra) = obj.keys().find(|k| !matches!(k.as_str(), "filter" | "sort" | "hidden_fields" | "group_by" | "field_order")) {
         return Err(AppError::BadRequest(format!("unknown key `{extra}` in view config")));
     }
     let mut out = Map::new();
@@ -163,6 +163,28 @@ pub fn normalize(fields: &[FieldOut], kind: Kind, raw: &Value) -> Result<Value, 
             }
         }
         out.insert("hidden_fields".into(), Value::Array(ids));
+    }
+
+    if let Some(order) = obj.get("field_order").filter(|v| !v.is_null()) {
+        let items = order
+            .as_array()
+            .ok_or_else(|| AppError::BadRequest("`field_order` must be an array".into()))?;
+        if items.len() > MAX_HIDDEN {
+            return Err(AppError::BadRequest(format!("`field_order` accepts at most {MAX_HIDDEN} entries")));
+        }
+        let mut ids: Vec<Value> = Vec::new();
+        for item in items {
+            let key = item
+                .as_str()
+                .ok_or_else(|| AppError::BadRequest("`field_order` entries must be strings".into()))?;
+            let field = field_by_key(fields, key)
+                .ok_or_else(|| AppError::BadRequest(format!("`field_order`: unknown field `{key}`")))?;
+            let id = Value::String(field.id.clone());
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        out.insert("field_order".into(), Value::Array(ids));
     }
 
     match (kind, obj.get("group_by").filter(|v| !v.is_null())) {

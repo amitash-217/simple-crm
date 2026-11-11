@@ -1,4 +1,4 @@
-export type FieldType = "text" | "number" | "boolean" | "date" | "phone" | "select" | "multi_select" | "relation";
+export type FieldType = "text" | "number" | "boolean" | "date" | "phone" | "email" | "long_text" | "select" | "multi_select" | "relation";
 
 export interface Option {
   id: string;
@@ -13,8 +13,8 @@ export interface Field {
   type: FieldType;
   is_primary: boolean;
   position: number;
-  // number: { integer }, relation: { table, many }
-  config: { integer?: boolean; table?: string; many?: boolean };
+  // number: { integer }, relation: { table, many }, date: { time }
+  config: { integer?: boolean; table?: string; many?: boolean; time?: boolean };
   options: Option[];
 }
 
@@ -48,6 +48,8 @@ export interface ViewConfig {
   filter?: unknown;
   sort?: Sort[];
   hidden_fields?: string[];
+  /** Field IDs in display order. Fields not listed follow in their default order. */
+  field_order?: string[];
   group_by?: string;
 }
 

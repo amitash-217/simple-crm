@@ -68,7 +68,7 @@ fn target<'a>(fields: &'a [FieldOut], key: &str) -> Result<Target<'a>, AppError>
     let field = field_by_key(fields, key)
         .ok_or_else(|| AppError::BadRequest(format!("unknown field `{key}`")))?;
     let kind = match field.field_type {
-        "text" | "phone" => Kind::Text,
+        "text" | "long_text" | "email" | "phone" => Kind::Text,
         "number" => Kind::Number,
         "boolean" => Kind::Bool,
         "date" => Kind::Date,
@@ -83,8 +83,8 @@ fn target<'a>(fields: &'a [FieldOut], key: &str) -> Result<Target<'a>, AppError>
 }
 
 /// `EXISTS (...)` over a join table, for the record being filtered (aliased `rec` in the list query).
-fn linked(join: &str, extra: &str) -> String {
-    format!("EXISTS (SELECT 1 FROM {join} WHERE record_id = rec.\"id\"{extra})")
+fn linked(join: &str, own: &str, extra: &str) -> String {
+    format!("EXISTS (SELECT 1 FROM {join} WHERE {own} = rec.\"id\"{extra})")
 }
 
 fn operand(t: &Target, v: &Value) -> Result<Sql, AppError> {
@@ -247,10 +247,10 @@ impl Walk<'_> {
     fn multi_condition(&mut self, t: &Target, op: &str, value: Option<&Value>) -> Result<String, AppError> {
         let field = t.field.ok_or_else(|| AppError::Internal("join field without a catalog entry".into()))?;
         let join = &t.expr;
-        let column = if field.field_type == "multi_select" { "option_id" } else { "target_id" };
+        let (own, column) = field.link_columns();
         match op {
-            "is_empty" => return Ok(format!("NOT {}", linked(join, ""))),
-            "is_not_empty" => return Ok(linked(join, "")),
+            "is_empty" => return Ok(format!("NOT {}", linked(join, own, ""))),
+            "is_not_empty" => return Ok(linked(join, own, "")),
             _ => {}
         }
         let value = value.ok_or_else(|| AppError::BadRequest(format!("operator `{op}` needs a `value`")))?;
@@ -266,7 +266,7 @@ impl Walk<'_> {
         match op {
             "has" => {
                 self.params.push(Sql::Text(one(value)?));
-                Ok(linked(join, &format!(" AND {column} = ?")))
+                Ok(linked(join, own, &format!(" AND {column} = ?")))
             }
             "has_any" => {
                 let items = value.as_array().ok_or_else(|| bad("`has_any` needs an array value"))?;
@@ -280,7 +280,7 @@ impl Walk<'_> {
                     self.params.push(Sql::Text(one(item)?));
                 }
                 let marks = vec!["?"; items.len()].join(", ");
-                Ok(linked(join, &format!(" AND {column} IN ({marks})")))
+                Ok(linked(join, own, &format!(" AND {column} IN ({marks})")))
             }
             _ => Err(AppError::Internal(format!("unhandled operator `{op}`"))),
         }

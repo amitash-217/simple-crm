@@ -127,21 +127,16 @@ fn check_targets(tx: &Transaction, assigned: &[(&FieldOut, Cell)]) -> Result<(),
     Ok(())
 }
 
-/// The join-table column that holds the linked ID.
-fn link_column(field: &FieldOut) -> &'static str {
-    if field.field_type == "multi_select" { "option_id" } else { "target_id" }
-}
-
 /// Replaces the links of each join-table field in `assigned`.
 fn write_links(tx: &Transaction, record_id: &str, assigned: &[(&FieldOut, Cell)]) -> Result<(), AppError> {
     for (field, cell) in assigned {
         let Cell::Links(ids) = cell else { continue };
         let join = ident(&field.sql_name)?;
-        tx.execute(&format!("DELETE FROM {join} WHERE record_id = ?1"), [record_id])?;
-        let column = link_column(field);
+        let (own, other) = field.link_columns();
+        tx.execute(&format!("DELETE FROM {join} WHERE {own} = ?1"), [record_id])?;
         for (position, id) in ids.iter().enumerate() {
             tx.execute(
-                &format!("INSERT INTO {join} (record_id, {column}, position) VALUES (?1, ?2, ?3)"),
+                &format!("INSERT INTO {join} ({own}, {other}, position) VALUES (?1, ?2, ?3)"),
                 params![record_id, id, position as i64],
             )?;
         }
@@ -194,9 +189,9 @@ fn load_links(conn: &Connection, fields: &[FieldOut], ids: &[&str]) -> Result<Li
     }
     let marks = vec!["?"; ids.len()].join(", ");
     for field in fields.iter().filter(|f| !f.has_column()) {
+        let (own, other) = field.link_columns();
         let sql = format!(
-            "SELECT record_id, {} FROM {} WHERE record_id IN ({marks}) ORDER BY position",
-            link_column(field),
+            "SELECT {own}, {other} FROM {} WHERE {own} IN ({marks}) ORDER BY position",
             ident(&field.sql_name)?,
         );
         let mut stmt = conn.prepare(&sql)?;

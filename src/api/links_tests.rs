@@ -436,3 +436,61 @@ async fn deleting_a_link_field_hides_it_and_frees_the_name() {
     let r = env.field("People", json!({ "name": "Skills", "type": "text" })).await;
     assert_eq!(r.status, StatusCode::CREATED);
 }
+
+#[tokio::test]
+async fn a_to_many_relation_adds_a_field_on_the_other_table_that_stays_in_sync() {
+    let crm = crm().await;
+    let env = &crm.env;
+    let ann = env.add("People", json!({ "Name": "Ann", "Projects": [crm.p[0], crm.p[1]] })).await;
+
+    // The partner is named after the table the relation was made on.
+    let back = env.get("Projects", &crm.p[0]).await;
+    assert_eq!(back["values"]["People"], json!([ann]));
+
+    // Setting links from the other side shows up on the first table.
+    let bob = env.add("People", json!({ "Name": "Bob" })).await;
+    let r = env.patch("Projects", &crm.p[2], json!({ "People": [bob, ann] })).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(env.get("People", &bob).await["values"]["Projects"], json!([crm.p[2]]));
+    assert_eq!(env.get("People", &ann).await["values"]["Projects"], json!([crm.p[0], crm.p[1], crm.p[2]]));
+
+    // Filters work on the partner too.
+    let hit = env.list("Projects", Some(cond("People", "has", json!(bob))), None, None, None).await;
+    assert_eq!(names(&hit), ["P3"]);
+
+    // Deleting a record unlinks it on both sides.
+    env.delete("People", &ann).await;
+    assert_eq!(env.get("Projects", &crm.p[0]).await["values"]["People"], json!([]));
+
+    // Deleting one field deletes its partner.
+    let r = env.call(Method::DELETE, "/api/tables/People/fields/Projects", None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(env.get("Projects", &crm.p[2]).await["values"].get("People").is_none());
+}
+
+#[tokio::test]
+async fn the_partner_field_is_optional_and_never_made_for_self_links() {
+    let crm = crm().await;
+    let env = &crm.env;
+    let r = env
+        .field("Companies", json!({ "name": "Deals", "type": "relation", "config": { "table": "Projects", "many": true, "create_related": false } }))
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.body);
+    let id = env.add("Companies", json!({ "Name": "C" })).await;
+    let _ = id;
+    assert!(env.get("Projects", &crm.p[0]).await["values"].get("Companies").is_none());
+
+    let r = env.field("Companies", json!({ "name": "Parent", "type": "relation", "config": { "table": "Companies", "many": true } })).await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.body);
+    let fields = env.call(Method::GET, "/api/tables/Companies/fields", None).await;
+    assert_eq!(fields.body.as_array().unwrap().len(), 3);
+
+    for config in [
+        json!({ "table": "Projects", "create_related": true }),
+        json!({ "table": "Companies", "many": true, "create_related": true }),
+        json!({ "table": "Projects", "many": true, "related": "x" }),
+    ] {
+        let r = env.field("Companies", json!({ "name": "Bad", "type": "relation", "config": config })).await;
+        assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
+    }
+}

@@ -8,6 +8,7 @@ use serde_json::Value;
 use crate::{catalog::FieldOut, error::AppError};
 
 const MAX_TEXT: usize = 100_000;
+const MAX_LONG_TEXT: usize = 1_000_000;
 const MAX_LINKS: usize = 1000;
 
 /// Validates `v` for `field` and returns the value to store. JSON `null` clears the field.
@@ -22,6 +23,15 @@ pub fn to_sql(field: &FieldOut, v: &Value) -> Result<Sql, AppError> {
             Some(_) => Err(bad(&format!("text is longer than {MAX_TEXT} characters"))),
             None => Err(bad("expected a string")),
         },
+        "long_text" => match v.as_str() {
+            Some(s) if s.chars().count() <= MAX_LONG_TEXT => Ok(Sql::Text(s.to_string())),
+            Some(_) => Err(bad(&format!("text is longer than {MAX_LONG_TEXT} characters"))),
+            None => Err(bad("expected a string")),
+        },
+        "email" => {
+            let s = v.as_str().ok_or_else(|| bad("expected a string"))?;
+            valid_email(s).then(|| Sql::Text(s.trim().to_string())).ok_or_else(|| bad("expected an email address like name@example.com"))
+        }
         "phone" => {
             let s = v.as_str().ok_or_else(|| bad("expected a string"))?;
             normalize_phone(s).map(Sql::Text).map_err(|m| bad(&m))
@@ -115,6 +125,18 @@ pub fn from_sql(field: &FieldOut, v: Sql) -> Value {
     }
 }
 
+/// One `@`, a non-empty local part, and a domain with a dot and no empty labels. No spaces; at most 254 characters.
+pub fn valid_email(raw: &str) -> bool {
+    let s = raw.trim();
+    let Some((local, domain)) = s.split_once('@') else { return false };
+    s.len() <= 254
+        && !local.is_empty()
+        && !s.chars().any(|c| c.is_whitespace() || c.is_control())
+        && !domain.contains('@')
+        && domain.contains('.')
+        && domain.split('.').all(|l| !l.is_empty())
+}
+
 /// Strips spaces, dashes, dots and parentheses, and requires E.164: `+` and 7 to 15 digits, not starting with 0.
 pub fn normalize_phone(raw: &str) -> Result<String, String> {
     let cleaned: String = raw.chars().filter(|c| !matches!(c, ' ' | '-' | '.' | '(' | ')')).collect();
@@ -196,6 +218,16 @@ mod tests {
         assert_eq!(normalize_phone("+44 20.7946.0958").unwrap(), "+442079460958");
         for bad in ["4155552671", "+0123456789", "+123456", "+1234567890123456", "+1415abc2671", "", "+"] {
             assert!(normalize_phone(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn emails() {
+        for ok in ["a@b.co", "first.last+tag@sub.example.com"] {
+            assert!(valid_email(ok), "{ok}");
+        }
+        for bad in ["", "a", "a@b", "@b.co", "a@@b.co", "a b@c.co", "a@b..co", "a@.co", "a@b."] {
+            assert!(!valid_email(bad), "{bad}");
         }
     }
 

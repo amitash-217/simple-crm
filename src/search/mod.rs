@@ -22,7 +22,7 @@ pub const MAX_LIMIT: usize = 50;
 
 /// Field types whose values are indexed.
 fn is_indexed(field: &FieldOut) -> bool {
-    matches!(field.field_type, "text" | "phone")
+    matches!(field.field_type, "text" | "long_text" | "email" | "phone")
 }
 
 /// The hex part of a table's generated name. Checking it as an identifier proves it is safe to reuse in other names.

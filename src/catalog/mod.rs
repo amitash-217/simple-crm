@@ -25,6 +25,8 @@ pub enum FieldType {
     Boolean,
     Date,
     Phone,
+    Email,
+    LongText,
     Select,
     MultiSelect,
     Relation,
@@ -38,11 +40,13 @@ impl FieldType {
             "boolean" => Ok(Self::Boolean),
             "date" => Ok(Self::Date),
             "phone" => Ok(Self::Phone),
+            "email" => Ok(Self::Email),
+            "long_text" => Ok(Self::LongText),
             "select" => Ok(Self::Select),
             "multi_select" => Ok(Self::MultiSelect),
             "relation" => Ok(Self::Relation),
             _ => Err(AppError::BadRequest(format!(
-                "unknown field type `{s}`; expected text, number, boolean, date, phone, select, multi_select or relation"
+                "unknown field type `{s}`; expected text, number, boolean, date, phone, email, long_text, select, multi_select or relation"
             ))),
         }
     }
@@ -54,6 +58,8 @@ impl FieldType {
             Self::Boolean => "boolean",
             Self::Date => "date",
             Self::Phone => "phone",
+            Self::Email => "email",
+            Self::LongText => "long_text",
             Self::Select => "select",
             Self::MultiSelect => "multi_select",
             Self::Relation => "relation",
@@ -66,7 +72,7 @@ impl FieldType {
             Self::Number if config.integer == Some(true) => "INTEGER",
             Self::Number => "REAL",
             Self::Boolean => "INTEGER",
-            Self::Text | Self::Date | Self::Phone | Self::Select | Self::MultiSelect | Self::Relation => "TEXT",
+            Self::Text | Self::LongText | Self::Email | Self::Date | Self::Phone | Self::Select | Self::MultiSelect | Self::Relation => "TEXT",
         }
     }
 }
@@ -83,6 +89,19 @@ pub struct FieldConfig {
     /// Relation fields only: link to many records instead of one. Defaults to false.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub many: Option<bool>,
+    /// Date fields only: also store a time of day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<bool>,
+    /// Relation fields, on create only: also add a field to the target table that shows the links from the other side.
+    /// Defaults to true for to-many relations to another table.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create_related: Option<bool>,
+    /// Stored on relation fields that have a partner on the other table: the partner field's ID. Never accepted in requests.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related: Option<String>,
+    /// Stored on the auto-created partner: it reads the partner's join table from the other end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reverse: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -135,6 +154,18 @@ pub struct FieldOut {
 impl FieldOut {
     pub fn many_relation(&self) -> bool {
         self.field_type == "relation" && self.config.get("many").and_then(Value::as_bool) == Some(true)
+    }
+
+    /// For a join-table field: the columns that hold this field's own record and the linked value.
+    /// A partner field created for the other side of a relation shares the join table, with the columns swapped.
+    pub fn link_columns(&self) -> (&'static str, &'static str) {
+        if self.field_type == "multi_select" {
+            ("record_id", "option_id")
+        } else if self.config.get("reverse").and_then(Value::as_bool) == Some(true) {
+            ("target_id", "record_id")
+        } else {
+            ("record_id", "target_id")
+        }
     }
 
     /// False for fields stored in a join table (multi-select, to-many relation) instead of a column.
@@ -307,6 +338,14 @@ pub fn delete_table(conn: &mut Connection, key: &str) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let table = resolve_table(&tx, key)?;
     tx.execute(&format!("UPDATE tables SET deleted_at = {NOW} WHERE id = ?1"), [&table.id])?;
+    // Partners of this table's relation fields would point at a deleted table.
+    tx.execute(
+        &format!(
+            "UPDATE fields SET deleted_at = {NOW} WHERE deleted_at IS NULL AND id IN
+             (SELECT json_extract(config_json, '$.related') FROM fields WHERE table_id = ?1 AND deleted_at IS NULL)"
+        ),
+        [&table.id],
+    )?;
     tx.commit()?;
     Ok(())
 }
@@ -514,6 +553,15 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
     if new.config.integer.is_some() && field_type != FieldType::Number {
         return Err(AppError::BadRequest("`integer` applies only to number fields".into()));
     }
+    if new.config.related.is_some() || new.config.reverse.is_some() {
+        return Err(AppError::BadRequest("`related` and `reverse` are set by the server".into()));
+    }
+    if new.config.create_related.is_some() && field_type != FieldType::Relation {
+        return Err(AppError::BadRequest("`create_related` applies only to relation fields".into()));
+    }
+    if new.config.time.is_some() && field_type != FieldType::Date {
+        return Err(AppError::BadRequest("`time` applies only to date fields".into()));
+    }
     if (new.config.table.is_some() || new.config.many.is_some()) && field_type != FieldType::Relation {
         return Err(AppError::BadRequest("`table` and `many` apply only to relation fields".into()));
     }
@@ -538,7 +586,8 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
     let field_sql = sql_name(prefix, &id);
 
     // For a relation, store the target's ID, so renaming the target table does not break the link.
-    let mut stored = FieldConfig { integer: new.config.integer, table: None, many: None };
+    let mut stored = FieldConfig { integer: new.config.integer, time: new.config.time, ..Default::default() };
+    let mut partner: Option<(String, Table)> = None;
     let mut target = None;
     if field_type == FieldType::Relation {
         let key = new
@@ -550,8 +599,22 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
             AppError::NotFound => AppError::BadRequest(format!("relation target table `{key}` does not exist")),
             other => other,
         })?;
+        let wants_partner = match new.config.create_related {
+            Some(true) if !many || found.id == table.id => {
+                return Err(AppError::BadRequest(
+                    "`create_related` needs a to-many relation to a different table".into(),
+                ))
+            }
+            Some(want) => want,
+            None => many && found.id != table.id,
+        };
         stored.table = Some(found.id.clone());
         stored.many = Some(many);
+        if wants_partner {
+            let partner_id = new_id();
+            stored.related = Some(partner_id.clone());
+            partner = Some((partner_id, found.clone()));
+        }
         target = Some(found);
     }
 
@@ -565,13 +628,43 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
         ),
         params![id, table.id, name, field_sql, field_type.as_str(), config],
     )?;
+    if let Some((partner_id, other)) = &partner {
+        // The partner has no storage of its own: it reads this field's join table from the other end.
+        let mut label = table.name.clone();
+        let mut n = 1;
+        while field_name_taken(&tx, &other.id, &label, "")? {
+            n += 1;
+            label = format!("{} {n}", table.name);
+        }
+        let back = FieldConfig {
+            table: Some(table.id.clone()),
+            many: Some(true),
+            related: Some(id.clone()),
+            reverse: Some(true),
+            ..Default::default()
+        };
+        tx.execute(
+            &format!(
+                "INSERT INTO fields (id, table_id, name, sql_name, type, config_json, position, is_primary, created_at)
+                 VALUES (?1, ?2, ?3, ?4, 'relation', ?5,
+                         (SELECT COALESCE(MAX(position), -1) + 1 FROM fields WHERE table_id = ?2), 0, {NOW})"
+            ),
+            params![
+                partner_id,
+                other.id,
+                label,
+                field_sql,
+                serde_json::to_string(&back).map_err(|e| AppError::Internal(e.to_string()))?
+            ],
+        )?;
+    }
     if let Some(options) = &new.options {
         let clears_column = field_type == FieldType::Select;
         sync_options(&tx, &table.sql_name, &id, &field_sql, clears_column, &[], options)?;
     }
 
-    // A new text or phone field changes what the search index covers.
-    if matches!(field_type, FieldType::Text | FieldType::Phone) {
+    // A new text, long text, email or phone field changes what the search index covers.
+    if matches!(field_type, FieldType::Text | FieldType::LongText | FieldType::Email | FieldType::Phone) {
         search::rebuild_index(&tx, &table, &read_fields(&tx, &table.id)?)?;
     }
 
@@ -620,8 +713,12 @@ pub fn delete_field(conn: &mut Connection, table_key: &str, field_key: &str) -> 
         return Err(AppError::BadRequest("the primary field cannot be deleted".into()));
     }
     tx.execute(&format!("UPDATE fields SET deleted_at = {NOW} WHERE id = ?1"), [&field.id])?;
+    // The partner on the other table has nothing left to show, so it goes too.
+    if let Some(partner) = field.config.get("related").and_then(Value::as_str) {
+        tx.execute(&format!("UPDATE fields SET deleted_at = {NOW} WHERE id = ?1 AND deleted_at IS NULL"), [partner])?;
+    }
     // The column stays in the table, but its text must stop matching searches.
-    if matches!(field.field_type, "text" | "phone") {
+    if matches!(field.field_type, "text" | "long_text" | "email" | "phone") {
         search::rebuild_index(&tx, &table, &read_fields(&tx, &table.id)?)?;
     }
     tx.commit()?;
@@ -925,7 +1022,7 @@ mod tests {
         let relation = |name: &str, many: bool| NewField {
             name: name.into(),
             field_type: "relation".into(),
-            config: FieldConfig { integer: None, table: Some("Companies".into()), many: Some(many) },
+            config: FieldConfig { integer: None, table: Some("Companies".into()), many: Some(many), ..Default::default() },
             options: None,
         };
         let (one_input, many_input) = (relation("Company", false), relation("Employers", true));

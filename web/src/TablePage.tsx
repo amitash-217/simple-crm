@@ -16,6 +16,7 @@ function clean(c: ViewConfig): ViewConfig {
   if (c.filter) out.filter = c.filter;
   if (c.sort?.length) out.sort = c.sort;
   if (c.hidden_fields?.length) out.hidden_fields = [...c.hidden_fields].sort();
+  if (c.field_order?.length) out.field_order = c.field_order;
   if (c.group_by) out.group_by = c.group_by;
   return out;
 }
@@ -130,7 +131,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
   const viewKey = view ? `${view.id}${JSON.stringify(view.config)}${view.stale}` : "all";
   useEffect(() => {
     if (!view) setCfg({});
-    else setCfg(view.stale ? { hidden_fields: view.config.hidden_fields, group_by: view.config.group_by } : view.config);
+    else setCfg(view.stale ? { hidden_fields: view.config.hidden_fields, field_order: view.config.field_order, group_by: view.config.group_by } : view.config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewKey]);
 
@@ -142,7 +143,14 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
   if (!table) return <div className="main">{error ? <ErrorText text={error} /> : <p className="muted pad">Loading…</p>}</div>;
 
-  const fields = table.fields;
+  // The view's order first, then any field it does not list, in the table's order. The primary field stays first.
+  const listed = cfg.field_order ?? [];
+  const byId = new Map(table.fields.map((f) => [f.id, f]));
+  const fields = [
+    ...table.fields.filter((f) => f.is_primary),
+    ...listed.map((id) => byId.get(id)).filter((f): f is Field => !!f && !f.is_primary),
+    ...table.fields.filter((f) => !f.is_primary && !listed.includes(f.id)),
+  ];
   const hidden = cfg.hidden_fields ?? [];
   const visible = fields.filter((f) => !hidden.includes(f.id));
   const selectFields = fields.filter((f) => f.type === "select");
@@ -176,6 +184,12 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
         throw e;
       }
     });
+  };
+
+  const moveField = (from: string, to: string) => {
+    const ids = fields.map((f) => f.id).filter((id) => id !== from);
+    ids.splice(ids.indexOf(to) + (fields.findIndex((f) => f.id === from) < fields.findIndex((f) => f.id === to) ? 1 : 0), 0, from);
+    setCfg((c) => ({ ...c, field_order: ids }));
   };
 
   const toggleHidden = (f: Field) => setCfg({ ...cfg, hidden_fields: hidden.includes(f.id) ? hidden.filter((h) => h !== f.id) : [...hidden, f.id] });
@@ -228,7 +242,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
   const deleteField = (f: Field) =>
     run(async () => {
-      const ok = await confirm({ title: `Delete the field “${f.name}”?`, message: "Its values are no longer shown. Views that use it will need updating.", confirmLabel: "Delete field", danger: true });
+      const ok = await confirm({ title: `Delete the field “${f.name}”?`, message: f.type === "relation" && f.config.many ? "Its values are no longer shown, and the related field in the linked table is deleted too. Views that use them will need updating." : "Its values are no longer shown. Views that use it will need updating.", confirmLabel: "Delete field", danger: true });
       if (!ok) return;
       await api.del(`${base}/fields/${f.id}`);
       await schemaChanged();
@@ -390,6 +404,13 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
             onSave={saveCell}
             onOpen={(rec) => setModal({ rec })}
             onAdd={() => setModal({ rec: null })}
+            onMoveField={moveField}
+            sort={cfg.sort ?? []}
+            onSort={(f, dir) => setCfg((c) => ({ ...c, sort: dir ? [{ field: f.id, dir }] : (c.sort ?? []).filter((s) => s.field !== f.id) }))}
+            onEditField={(f) => setFieldDlg({ field: f })}
+            onHideField={toggleHidden}
+            onDeleteField={deleteField}
+            onAddField={() => setFieldDlg({})}
             hasMore={!!rows.next}
             onMore={rows.more}
             loading={rows.loading}

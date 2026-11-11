@@ -10,6 +10,8 @@ const TYPES: { id: FieldType; label: string }[] = [
   { id: "boolean", label: "Checkbox" },
   { id: "date", label: "Date" },
   { id: "phone", label: "Phone" },
+  { id: "email", label: "Email" },
+  { id: "long_text", label: "Long text" },
   { id: "select", label: "Select" },
   { id: "multi_select", label: "Multi-select" },
   { id: "relation", label: "Relation" },
@@ -27,7 +29,9 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
   const [type, setType] = useState<FieldType>(field?.type ?? "text");
   const [integer, setInteger] = useState(false);
   const [target, setTarget] = useState(props.tables[0]?.id ?? props.tableId);
-  const [many, setMany] = useState(false);
+  const [many, setMany] = useState(true);
+  const [related, setRelated] = useState(true);
+  const [time, setTime] = useState(false);
   const [options, setOptions] = useState<OptionRow[]>(field ? field.options.map((o) => ({ id: o.id, label: o.label })) : []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,7 +48,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
       if (field) {
         await api.patch(`${base}/${field.id}`, { name, ...(hasOptions ? { options: opts } : {}) });
       } else {
-        const config = type === "number" ? { integer } : type === "relation" ? { table: target, many } : {};
+        const config = type === "number" ? { integer } : type === "relation" ? { table: target, many: many || related, create_related: related && target !== props.tableId } : type === "date" ? { time } : {};
         await api.post(base, { name, type, config, ...(hasOptions ? { options: opts } : {}) });
       }
       props.onSaved();
@@ -78,6 +82,11 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
             <input type="checkbox" checked={integer} onChange={(e) => setInteger(e.target.checked)} /> Whole numbers only
           </label>
         )}
+        {!field && type === "date" && (
+          <label className="inline">
+            <input type="checkbox" checked={time} onChange={(e) => setTime(e.target.checked)} /> Include time
+          </label>
+        )}
         {!field && type === "relation" && (
           <>
             <label>
@@ -90,8 +99,19 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
                 ))}
               </select>
             </label>
+            {target !== props.tableId && (
+              <label className="inline">
+                <input type="checkbox" checked={related} onChange={(e) => setRelated(e.target.checked)} /> Create related field in the linked table
+              </label>
+            )}
             <label className="inline">
-              <input type="checkbox" checked={many} onChange={(e) => setMany(e.target.checked)} /> Allow several records
+              <input
+                type="checkbox"
+                checked={many || (related && target !== props.tableId)}
+                disabled={related && target !== props.tableId}
+                onChange={(e) => setMany(e.target.checked)}
+              />{" "}
+              Allow several records
             </label>
           </>
         )}

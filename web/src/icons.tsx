@@ -56,6 +56,12 @@ const PATHS = {
   alert: <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4M12 17h.01" />,
   inbox: <path d="M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1Z" />,
   text: <path d="M4 7V4h16v3M9 20h6M12 4v16" />,
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
   number: <path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" />,
   boolean: <path d="m9 11 3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   date: (
@@ -104,6 +110,8 @@ const TYPE_ICONS: Record<FieldType, IconName> = {
   boolean: "boolean",
   date: "date",
   phone: "phone",
+  email: "mail",
+  long_text: "list",
   select: "select",
   multi_select: "multi",
   relation: "link",
