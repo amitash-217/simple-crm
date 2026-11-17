@@ -138,8 +138,8 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
           </>
         )}
         {hasOptions && (
-          <div>
-            <div className="label" style={{ marginBottom: 6 }}>Options</div>
+          <div className="opt-list">
+            <div className="label">Options</div>
             {options.map((o, i) => (
               <div className="row" key={i}>
                 <input autoFocus={!o.id && !o.label} value={o.label} placeholder="Option" onChange={(e) => setOptions(options.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
@@ -148,7 +148,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
                 </button>
               </div>
             ))}
-            <button type="button" className="btn small" onClick={() => setOptions([...options, { label: "" }])}>
+            <button type="button" className="btn small opt-add" onClick={() => setOptions([...options, { label: "" }])}>
               <Icon name="plus" size={14} /> Add option
             </button>
             {field && <p className="muted" style={{ margin: "8px 0 0", fontSize: 12.5 }}>Removing an option clears it from every record that uses it.</p>}

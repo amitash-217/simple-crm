@@ -36,15 +36,15 @@ function place(trigger: HTMLElement, want: number, minWidth = 0): React.CSSPrope
     : { left, minWidth: Math.max(r.width, minWidth), top: r.bottom + 4, maxHeight: Math.min(want, below) };
 }
 
-/** Closes a panel on a press outside it, on Escape and when the page scrolls. */
-function usePanel(open: boolean, wrap: React.RefObject<HTMLElement | null>, panel: React.RefObject<HTMLElement | null>, close: () => void) {
+/** Closes a panel on a press outside it or a resize, and moves it with its trigger when something scrolls. */
+function usePanel(open: boolean, wrap: React.RefObject<HTMLElement | null>, panel: React.RefObject<HTMLElement | null>, close: () => void, move: () => void) {
   useEffect(() => {
     if (!open) return;
     const down = (e: MouseEvent) => {
       if (wrap.current && !wrap.current.contains(e.target as Node)) close();
     };
     const scroll = (e: Event) => {
-      if (!panel.current?.contains(e.target as Node)) close();
+      if (!panel.current?.contains(e.target as Node)) move();
     };
     document.addEventListener("mousedown", down);
     window.addEventListener("scroll", scroll, true);
@@ -54,7 +54,8 @@ function usePanel(open: boolean, wrap: React.RefObject<HTMLElement | null>, pane
       window.removeEventListener("scroll", scroll, true);
       window.removeEventListener("resize", close);
     };
-  }, [open, close, wrap, panel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 }
 
 interface SelectProps {
@@ -82,9 +83,10 @@ export function Select(p: SelectProps) {
   const panel = useRef<HTMLDivElement>(null);
   const close = () => setOpen(false);
 
+  const move = () => btn.current && setPos(place(btn.current, 260));
   const show = () => {
     if (!btn.current) return;
-    setPos(place(btn.current, 260));
+    move();
     setAt(Math.max(0, options.findIndex((o) => o.value === p.value)));
     setOpen(true);
   };
@@ -92,7 +94,7 @@ export function Select(p: SelectProps) {
     if (p.defaultOpen) show();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  usePanel(open, wrap, panel, close);
+  usePanel(open, wrap, panel, close, move);
 
   useEffect(() => {
     if (open) panel.current?.querySelector<HTMLElement>('[data-on="true"]')?.scrollIntoView({ block: "nearest" });
@@ -147,7 +149,8 @@ export function Select(p: SelectProps) {
         <Icon name="chevron" size={13} />
       </button>
       {open && (
-        <div ref={panel} className="select-panel" role="listbox" style={pos} onMouseDown={(e) => e.preventDefault()}>
+        // A label around the select would forward a click inside the list to the trigger and reopen it.
+        <div ref={panel} className="select-panel" role="listbox" style={pos} onMouseDown={(e) => e.preventDefault()} onClick={(e) => e.preventDefault()}>
           {options.map((o, i) => (
             <div
               key={`${o.value}-${i}`}
@@ -202,9 +205,10 @@ export function DatePicker(p: DateProps) {
   const panel = useRef<HTMLDivElement>(null);
   const close = () => setOpen(false);
 
+  const move = () => btn.current && setPos(place(btn.current, p.time ? 390 : 340, 264));
   const show = () => {
     if (!btn.current) return;
-    setPos(place(btn.current, p.time ? 390 : 340, 264));
+    move();
     const s = parse(p.value);
     if (s) setView({ y: s.y, m: s.m });
     setOpen(true);
@@ -213,7 +217,7 @@ export function DatePicker(p: DateProps) {
     if (p.defaultOpen) show();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  usePanel(open, wrap, panel, close);
+  usePanel(open, wrap, panel, close, move);
 
   const nowTime = { hh: today.getHours(), mm: today.getMinutes() };
   const emit = (y: number, m: number, d: number, hh: number, mm: number) => p.onChange(p.time ? `${ymd(y, m, d)}T${two(hh)}:${two(mm)}` : ymd(y, m, d));
@@ -274,6 +278,7 @@ export function DatePicker(p: DateProps) {
           role="dialog"
           aria-label="Choose a date"
           style={pos}
+          onClick={(e) => e.preventDefault()}
           // Keep focus on the trigger, so a grid cell is not saved while you pick. The time boxes still take focus.
           onMouseDown={(e) => (e.target as HTMLElement).tagName !== "INPUT" && e.preventDefault()}
         >
@@ -327,7 +332,15 @@ export function DatePicker(p: DateProps) {
               Clear
             </button>
             <span className="grow" />
-            <button type="button" className="btn small" onClick={() => (p.time ? setTime(nowTime.hh, nowTime.mm) : pick(today.getFullYear(), today.getMonth(), today.getDate()))}>
+            <button
+              type="button"
+              className="btn small"
+              onClick={() => {
+                emit(today.getFullYear(), today.getMonth(), today.getDate(), nowTime.hh, nowTime.mm);
+                setView({ y: today.getFullYear(), m: today.getMonth() });
+                if (!p.time) close();
+              }}
+            >
               {p.time ? "Now" : "Today"}
             </button>
             {p.time && (

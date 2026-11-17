@@ -1770,7 +1770,7 @@ input:-webkit-autofill:focus {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 .main > * {
-  animation: rise 0.28s var(--ease) both;
+  animation: rise 0.28s var(--ease) backwards;
 }
 .main > :nth-child(2) {
   animation-delay: 0.03s;
@@ -1782,7 +1782,7 @@ input:-webkit-autofill:focus {
   animation-delay: 0.09s;
 }
 .grid tbody tr {
-  animation: rise 0.26s var(--ease) both;
+  animation: rise 0.26s var(--ease) backwards;
 }
 .grid tbody tr:nth-child(2) {
   animation-delay: 0.02s;
@@ -1822,7 +1822,7 @@ input:-webkit-autofill:focus {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .column .card-item {
-  animation: rise 0.24s var(--ease) both;
+  animation: rise 0.24s var(--ease) backwards;
 }
 input[type="checkbox"]:checked {
   animation: tick 0.18s var(--ease);
@@ -1880,10 +1880,10 @@ html.theming * {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease !important;
 }
 .drawer {
-  animation: drawer-in 0.3s var(--ease) both;
+  animation: drawer-in 0.3s var(--ease) backwards;
 }
 .drawer.leaving {
-  animation: drawer-out 0.18s cubic-bezier(0.5, 0, 0.75, 0) both;
+  animation: drawer-out 0.18s cubic-bezier(0.5, 0, 0.75, 0) forwards;
 }
 @keyframes drawer-in {
   from {
@@ -1896,10 +1896,10 @@ html.theming * {
   }
 }
 .grid tbody tr.row-new {
-  animation: row-in 0.45s var(--ease) both;
+  animation: row-in 0.45s var(--ease) backwards;
 }
 .grid tbody tr.row-new td {
-  animation: row-flash 1.4s ease-out both;
+  animation: row-flash 1.4s ease-out backwards;
 }
 @keyframes row-in {
   from {
@@ -1911,4 +1911,107 @@ html.theming * {
   from {
     background: var(--accent-soft);
   }
+}
+
+/* ---------- Spacing: one rhythm of 4 / 8 / 12 / 16 / 24 ---------- */
+.main {
+  padding: 20px 28px 48px;
+}
+.head {
+  margin-bottom: 18px;
+}
+.tabs {
+  margin-bottom: 16px;
+}
+.toolbar {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.modal {
+  padding: 24px;
+}
+.modal-head {
+  margin-bottom: 20px;
+}
+.form {
+  gap: 18px;
+}
+.field-row,
+.form label {
+  gap: 8px;
+}
+.form .actions,
+.modal .actions {
+  margin-top: 12px;
+  gap: 10px;
+}
+.panel-body {
+  padding: 14px;
+  gap: 10px;
+}
+.row {
+  gap: 8px;
+}
+.card {
+  padding: 24px;
+}
+.rec-form {
+  padding: 12px 12px 24px;
+}
+.rec-row {
+  gap: 8px;
+  padding: 3px 0;
+}
+.drawer-head {
+  height: 52px;
+  padding: 0 14px 0 20px;
+}
+.board {
+  gap: 12px;
+}
+.column {
+  padding: 10px;
+  gap: 8px;
+}
+.card-item {
+  padding: 12px 14px;
+}
+.date-panel {
+  padding: 14px;
+}
+.date-head {
+  margin-bottom: 10px;
+}
+.date-time,
+.date-foot {
+  margin-top: 12px;
+}
+.select-panel {
+  padding: 6px;
+}
+.select-opt {
+  height: 30px;
+  padding: 0 10px;
+}
+.popover-panel {
+  padding: 4px;
+}
+.date-panel input.time-box:not([type="checkbox"]) {
+  width: 48px;
+  height: 30px;
+  padding: 0;
+  text-align: center;
+  background: var(--inset);
+  border-color: var(--border-strong);
+}
+.date-panel input.time-box:not([type="checkbox"]):focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.opt-list {
+  display: grid;
+  gap: 8px;
+}
+.opt-add {
+  justify-self: start;
 }
