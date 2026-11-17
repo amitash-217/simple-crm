@@ -262,7 +262,10 @@ mod tests {
             .unwrap();
         let table = db.read(|c| resolve_table(c, "Deals")).await.unwrap();
         let t = table.clone();
-        db.read(move |c| Ok(assert_index_matches_content(c, &t))).await.unwrap();
+        db.read(move |c| {
+            assert_index_matches_content(c, &t);
+            Ok(())
+        }).await.unwrap();
 
         // Updates, clearing a value, and deletes.
         let (a, b, g) = ids;
@@ -276,7 +279,10 @@ mod tests {
         .await
         .unwrap();
         let t = table.clone();
-        db.read(move |c| Ok(assert_index_matches_content(c, &t))).await.unwrap();
+        db.read(move |c| {
+            assert_index_matches_content(c, &t);
+            Ok(())
+        }).await.unwrap();
 
         // A new text field is indexed from then on, and a deleted one is dropped from the index.
         db.write(|c| add_field(c, "Deals", new_field("Mobile", "phone"))).await.unwrap();
@@ -285,7 +291,10 @@ mod tests {
             .await
             .unwrap();
         let t = table.clone();
-        db.read(move |c| Ok(assert_index_matches_content(c, &t))).await.unwrap();
+        db.read(move |c| {
+            assert_index_matches_content(c, &t);
+            Ok(())
+        }).await.unwrap();
 
         let hits = |q: &'static str| {
             let db = db.clone();
@@ -321,7 +330,10 @@ mod tests {
         .unwrap();
 
         let table = db.read(|c| resolve_table(c, "Deals")).await.unwrap();
-        db.read(move |c| Ok(assert_index_matches_content(c, &table))).await.unwrap();
+        db.read(move |c| {
+            assert_index_matches_content(c, &table);
+            Ok(())
+        }).await.unwrap();
         let found = db.read(|c| global(c, "charlie", 5)).await.unwrap();
         assert_eq!(found[0].matches.len(), 1);
         assert_eq!(found[0].matches[0].id, ids.1, "the match still points at the right record");

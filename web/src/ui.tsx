@@ -65,7 +65,42 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
   );
 }
 
-export const ErrorText = ({ text }: { text: string }) =>
+/** A panel that slides in from the right edge. The page behind it stays usable. Escape or the close button closes it. */
+export function Drawer(props: { title: string; chip?: string; actions?: ReactNode; onClose: () => void; children: ReactNode }) {
+  const [leaving, setLeaving] = useState(false);
+  // Slide out first, then let the parent unmount the panel.
+  const close = () => {
+    if (leaving) return;
+    setLeaving(true);
+    setTimeout(props.onClose, 180);
+  };
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      // A dialog or menu opened from the panel (a record picker, a confirmation) takes Escape first.
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"], .popover-panel')) close();
+    };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  });
+  return (
+    <div className="drawer-scrim">
+      <aside className={`drawer${leaving ? " leaving" : ""}`} aria-label={props.title}>
+        <div className="drawer-head">
+          {props.chip && <span className="drawer-chip">{props.chip}</span>}
+          <h2 title={props.title}>{props.title}</h2>
+          <span className="spacer" />
+          {props.actions}
+          <button className="btn tool icon-only" onClick={close} aria-label="Close" title="Close">
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+        {props.children}
+      </aside>
+    </div>
+  );
+}
+
+export const ErrorText =({ text }: { text: string }) =>
   text ? (
     <div className="error" role="alert">
       <Icon name="alert" size={14} /> {text}

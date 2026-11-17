@@ -198,6 +198,12 @@ export function Grid(p: GridProps) {
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const first = p.loading && p.records.length === 0;
+  // Rows that were not here at the last render slide in, once the first page has loaded.
+  const known = useRef<Set<string> | null>(null);
+  const fresh = new Set(known.current ? p.records.filter((x) => !known.current!.has(x.id)).map((x) => x.id) : []);
+  useEffect(() => {
+    if (p.records.length > 0 || known.current) known.current = new Set(p.records.map((x) => x.id));
+  });
   const allSelected = p.records.every((r) => p.selected.has(r.id));
   const sortDir = (f: Field) => (p.sort[0]?.field === f.id ? p.sort[0].dir : null);
   return (
@@ -276,7 +282,7 @@ export function Grid(p: GridProps) {
               </tr>
             ))}
           {p.records.map((rec, i) => (
-            <tr key={rec.id} className={p.selected.has(rec.id) ? "selected" : undefined}>
+            <tr key={rec.id} className={`${p.selected.has(rec.id) ? "selected" : ""}${fresh.has(rec.id) ? " row-new" : ""}` || undefined}>
               <td className="rownum">
                 <input type="checkbox" aria-label={`Select record ${i + 1}`} checked={p.selected.has(rec.id)} onChange={(e) => p.onSelect([rec.id], e.target.checked)} />
                 <span className="n">{i + 1}</span>

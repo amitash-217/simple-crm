@@ -9,6 +9,7 @@ import { RecordModal } from "./RecordModal";
 import type { Field, Rec, Table, TableDetail, View, ViewConfig } from "./types";
 import { Icon, typeIcon } from "./icons";
 import { ErrorText, Modal, Popover, useDialogs } from "./ui";
+import { Select } from "./Pickers";
 
 /** A config reduced to what the API stores, so two configs compare equal when they mean the same. */
 function clean(c: ViewConfig): ViewConfig {
@@ -401,14 +402,14 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
       {isKanban && !groupField && (
         <div className="banner">
           Choose the select field that makes the columns:
-          <select value="" onChange={(e) => setCfg({ ...cfg, group_by: e.target.value })}>
+          <Select value="" onChange={(e) => setCfg({ ...cfg, group_by: e.target.value })}>
             <option value="" />
             {selectFields.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
               </option>
             ))}
-          </select>
+          </Select>
           {selectFields.length === 0 && <span className="muted">This table has no select fields yet. Add one from Fields.</span>}
         </div>
       )}
@@ -466,6 +467,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
             setModal(null);
             rows.reload();
           }}
+          onChanged={() => rows.reload()}
           onDeleted={() => {
             setModal(null);
             rows.reload();
@@ -528,22 +530,22 @@ function NewViewDialog(props: {
         </label>
         <label>
           Layout
-          <select value={kind} onChange={(e) => setKind(e.target.value as "grid" | "kanban")}>
+          <Select value={kind} onChange={(e) => setKind(e.target.value as "grid" | "kanban")}>
             <option value="grid">Grid</option>
             <option value="kanban">Kanban board</option>
-          </select>
+          </Select>
         </label>
         {kind === "kanban" &&
           (props.selectFields.length ? (
             <label>
               Columns from
-              <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+              <Select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
                 {props.selectFields.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           ) : (
             <div className="error">Add a select field first. A board needs one for its columns.</div>

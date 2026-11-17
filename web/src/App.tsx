@@ -7,6 +7,36 @@ import { TablePage } from "./TablePage";
 import type { Table, User } from "./types";
 import { DialogProvider, ErrorText, initials, Modal } from "./ui";
 
+/** The theme in effect: the saved choice, else the system's. */
+const currentTheme = (): "light" | "dark" => {
+  const set = document.documentElement.dataset.theme;
+  if (set === "light" || set === "dark") return set;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+/** Switches between the light and dark theme and remembers the choice on this device. */
+function ThemeToggle() {
+  const [theme, setTheme] = useState(currentTheme);
+  const flip = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    const root = document.documentElement;
+    root.classList.add("theming");
+    setTimeout(() => root.classList.remove("theming"), 300);
+    root.dataset.theme = next;
+    try {
+      localStorage.setItem("theme", next);
+    } catch {
+      // Private mode: the choice lasts until the tab closes.
+    }
+    setTheme(next);
+  };
+  return (
+    <button className="nav-item" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+      <Icon name={theme === "dark" ? "sun" : "moon"} size={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
+    </button>
+  );
+}
+
 function useHash(): string {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
@@ -87,6 +117,7 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
           <a href="#/settings" className={`nav-item${onSettings ? " on" : ""}`}>
             <Icon name="settings" size={15} /> Settings
           </a>
+          <ThemeToggle />
           <button className="nav-item" onClick={onLogout}>
             <Icon name="logout" size={15} /> Sign out
           </button>

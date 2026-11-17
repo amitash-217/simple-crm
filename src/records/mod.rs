@@ -423,7 +423,7 @@ fn encode_cursor(values: &[Sql]) -> String {
 
 fn decode_cursor(cursor: &str, expected: usize) -> Result<Vec<Sql>, AppError> {
     let bad = || AppError::BadRequest("invalid cursor".into());
-    if cursor.len() > MAX_CURSOR || cursor.len() % 2 != 0 || !cursor.is_ascii() {
+    if cursor.len() > MAX_CURSOR || !cursor.len().is_multiple_of(2) || !cursor.is_ascii() {
         return Err(bad());
     }
     let bytes = (0..cursor.len())

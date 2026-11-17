@@ -32,7 +32,7 @@ pub struct AuthUser {
 }
 
 /// Extractor that also requires the caller to be an admin.
-pub struct AdminUser(pub AuthUser);
+pub struct AdminUser;
 
 pub fn new_id() -> String {
     uuid::Uuid::now_v7().to_string()
@@ -228,7 +228,7 @@ impl FromRequestParts<AppState> for AdminUser {
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
         let user = AuthUser::from_request_parts(parts, state).await?;
         if user.is_admin {
-            Ok(AdminUser(user))
+            Ok(AdminUser)
         } else {
             Err(AppError::Forbidden("admin access required".into()))
         }

@@ -3,6 +3,7 @@ import { api, errorMessage } from "./api";
 import type { Field, FieldType, Table } from "./types";
 import { Icon } from "./icons";
 import { ErrorText, Modal } from "./ui";
+import { Select } from "./Pickers";
 
 const TYPES: { id: FieldType; label: string }[] = [
   { id: "text", label: "Text" },
@@ -81,7 +82,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
         {(!field || canChangeType) && (
           <label>
             Type
-            <select value={type} onChange={(e) => {
+            <Select value={type} onChange={(e) => {
                 setType(e.target.value as FieldType);
                 setError("");
               }}>
@@ -90,7 +91,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
                   {t.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
         {field && !canChangeType && (
@@ -118,13 +119,13 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
           <>
             <label>
               Links to
-              <select value={target} onChange={(e) => setTarget(e.target.value)}>
+              <Select value={target} onChange={(e) => setTarget(e.target.value)}>
                 {props.tables.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             {!selfLink && (
               <label className="inline">

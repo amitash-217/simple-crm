@@ -465,7 +465,10 @@ pub fn list_fields(conn: &Connection, table_key: &str) -> Result<Vec<FieldOut>, 
 }
 
 /// Checks labels and colors, and returns the cleaned options.
-fn validate_options(input: &[OptionInput]) -> Result<Vec<(Option<&str>, String, Option<&str>)>, AppError> {
+/// An option as `(id, label, color)`, once checked.
+type CleanOption<'a> = (Option<&'a str>, String, Option<&'a str>);
+
+fn validate_options(input: &[OptionInput]) -> Result<Vec<CleanOption<'_>>, AppError> {
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(input.len());
     for option in input {
@@ -1014,7 +1017,7 @@ mod tests {
         db.write(|c| delete_table(c, "Deals")).await.unwrap();
 
         assert!(matches!(db.read(|c| resolve_table(c, "Deals")).await, Err(AppError::NotFound)));
-        assert!(db.read(|c| list_tables(c)).await.unwrap().is_empty());
+        assert!(db.read(list_tables).await.unwrap().is_empty());
 
         let table_sql = detail.table.sql_name.clone();
         let cols = db.read(move |c| Ok(columns(c, &table_sql))).await.unwrap();

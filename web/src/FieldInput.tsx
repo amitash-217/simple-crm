@@ -3,6 +3,7 @@ import { errorMessage, listRecords } from "./api";
 import { labelOf, tableDetail, useRecordLabel } from "./labels";
 import { Icon } from "./icons";
 import type { Field, Rec } from "./types";
+import { DatePicker, Select } from "./Pickers";
 
 /** A stable colour class for an option, by its place in the field's option list. */
 export function optionTone(field: Field, label: string): string {
@@ -92,27 +93,22 @@ export function FieldInput(p: InputProps) {
       );
     case "date":
       return field.config.time ? (
-        <input {...keys} type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value))} />
+        <DatePicker {...keys} time defaultOpen={p.autoFocus} value={toLocalInput(value)} onChange={(v) => onChange(fromLocalInput(v))} />
       ) : (
-        <input
-          {...keys}
-          type="date"
-          value={typeof value === "string" ? value.slice(0, 10) : ""}
-          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
-        />
+        <DatePicker {...keys} defaultOpen={p.autoFocus} value={typeof value === "string" ? value.slice(0, 10) : ""} onChange={(v) => onChange(v === "" ? null : v)} />
       );
     case "boolean":
       return <input type="checkbox" autoFocus={p.autoFocus} checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
     case "select":
       return (
-        <select {...keys} value={(value as string | null) ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}>
+        <Select {...keys} defaultOpen={p.autoFocus} value={(value as string | null) ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}>
           <option value="" />
           {field.options.map((o) => (
             <option key={o.id} value={o.label}>
               {o.label}
             </option>
           ))}
-        </select>
+        </Select>
       );
     case "multi_select": {
       const chosen = Array.isArray(value) ? (value as string[]) : [];

@@ -52,7 +52,7 @@ struct FieldPatchBody {
 }
 
 async fn list(_: AuthUser, State(state): State<AppState>) -> Result<Json<Vec<Table>>, AppError> {
-    Ok(Json(state.db.read(|c| catalog::list_tables(c)).await?))
+    Ok(Json(state.db.read(catalog::list_tables).await?))
 }
 
 async fn create(

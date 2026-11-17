@@ -2,6 +2,7 @@ import { useState } from "react";
 import { RelationInput, fromLocalInput, toLocalInput } from "./FieldInput";
 import { Icon } from "./icons";
 import type { Field, Sort } from "./types";
+import { DatePicker, Select } from "./Pickers";
 
 type Mode = "and" | "or";
 export interface Cond {
@@ -93,14 +94,14 @@ export function FilterEditor({ fields, filter, onChange }: { fields: Field[]; fi
             {i === 0 ? (
               <span className="lead">Where</span>
             ) : i === 1 ? (
-              <select className="lead" value={mode} onChange={(e) => emit(e.target.value as Mode, rows)}>
+              <Select className="lead" value={mode} onChange={(e) => emit(e.target.value as Mode, rows)}>
                 <option value="and">and</option>
                 <option value="or">or</option>
-              </select>
+              </Select>
             ) : (
               <span className="lead">{mode}</span>
             )}
-            <select
+            <Select
               value={r.field}
               onChange={(e) => {
                 const nf = fields.find((f) => f.id === e.target.value)!;
@@ -113,15 +114,15 @@ export function FilterEditor({ fields, filter, onChange }: { fields: Field[]; fi
                   {f.name}
                 </option>
               ))}
-            </select>
+            </Select>
             {field && (
-              <select value={r.op} onChange={(e) => set(i, { op: e.target.value, value: NO_VALUE.includes(e.target.value) ? undefined : r.value })}>
+              <Select value={r.op} onChange={(e) => set(i, { op: e.target.value, value: NO_VALUE.includes(e.target.value) ? undefined : r.value })}>
                 {opsFor(field).map((op) => (
                   <option key={op} value={op}>
                     {OP_LABEL[op]}
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
             {field && !NO_VALUE.includes(r.op) && <ValueInput field={field} value={r.value} onChange={(v) => set(i, { value: v })} />}
             <button className="btn ghost icon-only" onClick={() => emit(mode, rows.filter((_, j) => j !== i))} aria-label="Remove filter">
@@ -144,29 +145,29 @@ function ValueInput({ field, value, onChange }: { field: Field; value: unknown; 
       return <input type="number" value={(value as number | undefined) ?? ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />;
     case "date":
       return field.config.time ? (
-        <input type="datetime-local" value={toLocalInput(value)} onChange={(e) => onChange(fromLocalInput(e.target.value) ?? undefined)} />
+        <DatePicker time value={toLocalInput(value)} onChange={(v) => onChange(fromLocalInput(v) ?? undefined)} />
       ) : (
-        <input type="date" value={(value as string | undefined)?.slice(0, 10) ?? ""} onChange={(e) => onChange(e.target.value || undefined)} />
+        <DatePicker value={(value as string | undefined)?.slice(0, 10) ?? ""} onChange={(v) => onChange(v || undefined)} />
       );
     case "boolean":
       return (
-        <select value={value === undefined ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "true")}>
+        <Select value={value === undefined ? "" : String(value)} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "true")}>
           <option value="" />
           <option value="true">checked</option>
           <option value="false">unchecked</option>
-        </select>
+        </Select>
       );
     case "select":
     case "multi_select":
       return (
-        <select value={(value as string | undefined) ?? ""} onChange={(e) => onChange(e.target.value || undefined)}>
+        <Select value={(value as string | undefined) ?? ""} onChange={(e) => onChange(e.target.value || undefined)}>
           <option value="" />
           {field.options.map((o) => (
             <option key={o.id} value={o.id}>
               {o.label}
             </option>
           ))}
-        </select>
+        </Select>
       );
     case "relation":
       // A filter compares against one record, even for a to-many field.
@@ -192,7 +193,7 @@ export function SortEditor({ fields, sort, onChange }: { fields: Field[]; sort: 
       {sort.map((s, i) => (
         <div className="row" key={i}>
           <span className="lead">{i === 0 ? "Sort by" : "then by"}</span>
-          <select value={s.field} onChange={(e) => emit(sort.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))}>
+          <Select value={s.field} onChange={(e) => emit(sort.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))}>
             {sortable
               .filter((f) => f.id === s.field || !used.has(f.id))
               .map((f) => (
@@ -201,11 +202,11 @@ export function SortEditor({ fields, sort, onChange }: { fields: Field[]; sort: 
                 </option>
               ))}
             {!sortable.some((f) => f.id === s.field) && <option value={s.field}>(deleted field)</option>}
-          </select>
-          <select value={s.dir} onChange={(e) => emit(sort.map((x, j) => (j === i ? { ...x, dir: e.target.value as "asc" | "desc" } : x)))}>
+          </Select>
+          <Select value={s.dir} onChange={(e) => emit(sort.map((x, j) => (j === i ? { ...x, dir: e.target.value as "asc" | "desc" } : x)))}>
             <option value="asc">ascending</option>
             <option value="desc">descending</option>
-          </select>
+          </Select>
           <button className="btn ghost icon-only" onClick={() => emit(sort.filter((_, j) => j !== i))} aria-label="Remove sort">
             <Icon name="x" size={15} />
           </button>
