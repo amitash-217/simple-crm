@@ -1,41 +1,83 @@
-/* ---------- Tokens: one dark theme ---------- */
+/* ---------- Tokens: a light, Twenty-style theme, with a dark one for dark system settings ---------- */
 :root {
-  --bg: #0c0c0e;
-  --sidebar: #09090b;
-  --surface: #121214;
-  --surface-2: #17171a;
-  --inset: #0a0a0c;
-  --hover: rgba(255, 255, 255, 0.045);
-  --active: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.075);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #ececee;
-  --text-2: #a1a1a9;
-  --text-3: #6c6c76;
-  --accent: #7ea2ff;
-  --accent-soft: rgba(126, 162, 255, 0.12);
-  --accent-ring: rgba(126, 162, 255, 0.35);
-  --danger: #ef6b64;
-  --danger-soft: rgba(239, 107, 100, 0.12);
-  --warn: #e0b35a;
-  --warn-soft: rgba(224, 179, 90, 0.1);
-  --ink: #0c0c0e;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --shadow-pop: 0 0 0 1px var(--border), 0 12px 32px rgba(0, 0, 0, 0.55);
+  --bg: #ffffff;
+  --sidebar: #fcfcfc;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --inset: #ffffff;
+  --hover: rgba(0, 0, 0, 0.04);
+  --active: rgba(0, 0, 0, 0.07);
+  --border: #ebebeb;
+  --border-strong: #d6d6d6;
+  --border-hover: #bdbdbd;
+  --text: #333333;
+  --text-2: #666666;
+  --text-3: #999999;
+  --accent: #1961ed;
+  --accent-soft: rgba(25, 97, 237, 0.09);
+  --accent-ring: rgba(25, 97, 237, 0.3);
+  --danger: #e5484d;
+  --danger-soft: rgba(229, 72, 77, 0.1);
+  --warn: #b7791f;
+  --warn-soft: rgba(224, 179, 90, 0.16);
+  --ink: #ffffff;
+  --primary-hover: #1450c8;
+  --scroll: rgba(0, 0, 0, 0.2);
+  --veil: rgba(0, 0, 0, 0.35);
+  --radius: 4px;
+  --radius-lg: 8px;
+  --shadow-pop: 0 0 0 1px var(--border), 0 8px 24px rgba(0, 0, 0, 0.12);
   --font: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* Option tones: a muted hue each, used as a tint, a border and a text colour. */
-  --t0: 110, 155, 255;
-  --t1: 95, 191, 143;
-  --t2: 214, 162, 74;
-  --t3: 224, 122, 112;
-  --t4: 165, 144, 232;
-  --t5: 79, 184, 176;
-  --t6: 217, 138, 176;
-  --t7: 154, 154, 163;
+  /* Option tones: a hue each, used as a tint, a border and a text colour. */
+  --t0: 25, 97, 237;
+  --t1: 30, 150, 90;
+  --t2: 196, 130, 20;
+  --t3: 214, 80, 70;
+  --t4: 130, 100, 210;
+  --t5: 30, 150, 145;
+  --t6: 200, 80, 140;
+  --t7: 120, 120, 128;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141414;
+    --sidebar: #1a1a1a;
+    --surface: #1b1b1b;
+    --surface-2: #202020;
+    --inset: #161616;
+    --hover: rgba(255, 255, 255, 0.05);
+    --active: rgba(255, 255, 255, 0.09);
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
+    --border-hover: #555555;
+    --text: #ebebeb;
+    --text-2: #b3b3b3;
+    --text-3: #7a7a7a;
+    --accent: #5b8def;
+    --accent-soft: rgba(91, 141, 239, 0.14);
+    --accent-ring: rgba(91, 141, 239, 0.35);
+    --danger: #ef6b64;
+    --danger-soft: rgba(239, 107, 100, 0.14);
+    --warn: #e0b35a;
+    --warn-soft: rgba(224, 179, 90, 0.12);
+    --ink: #0f0f0f;
+    --primary-hover: #7aa3f5;
+    --scroll: rgba(255, 255, 255, 0.16);
+    --veil: rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 0 0 1px var(--border), 0 12px 32px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+    --t0: 110, 155, 255;
+    --t1: 95, 191, 143;
+    --t2: 214, 162, 74;
+    --t3: 224, 122, 112;
+    --t4: 165, 144, 232;
+    --t5: 79, 184, 176;
+    --t6: 217, 138, 176;
+    --t7: 154, 154, 163;
+  }
 }
 
 /* ---------- Base ---------- */
@@ -49,7 +91,7 @@ body {
 body {
   margin: 0;
   color: var(--text);
-  font: 13.5px/1.5 var(--font);
+  font: 13px/1.5 var(--font);
   font-feature-settings: "cv11", "ss03", "calt";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -97,7 +139,7 @@ code {
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: var(--scroll) transparent;
 }
 
 /* ---------- Controls ---------- */
@@ -130,7 +172,7 @@ input::placeholder {
 }
 input:not([type="checkbox"]):hover,
 select:hover {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: var(--border-hover);
 }
 input:not([type="checkbox"]):focus,
 select:focus {
@@ -156,7 +198,7 @@ input[type="checkbox"] {
   transition: background 0.1s, border-color 0.1s;
 }
 input[type="checkbox"]:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--border-hover);
 }
 input[type="checkbox"]:checked {
   background: var(--text) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230c0c0e' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 11px no-repeat;
@@ -185,20 +227,20 @@ input[type="checkbox"]:disabled {
 }
 .btn:hover {
   background: var(--active);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--border-hover);
 }
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .btn.primary {
-  background: var(--text);
-  border-color: var(--text);
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--ink);
 }
 .btn.primary:hover {
-  background: #fff;
-  border-color: #fff;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 .btn.ghost,
 .btn.tool {
@@ -239,11 +281,12 @@ input[type="checkbox"]:disabled {
 .btn.danger-solid {
   background: var(--danger);
   border-color: var(--danger);
-  color: #1a0605;
+  color: #ffffff;
 }
 .btn.danger-solid:hover {
-  background: #f58078;
-  border-color: #f58078;
+  background: var(--danger);
+  border-color: var(--danger);
+  filter: brightness(1.08);
 }
 .danger,
 .btn.ghost.danger {
@@ -360,13 +403,13 @@ input[type="checkbox"]:disabled {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: radial-gradient(700px 360px at 50% 0%, rgba(255, 255, 255, 0.035), transparent 70%), var(--bg);
+  background: var(--sidebar);
 }
 .logo {
   display: inline-grid;
   place-items: center;
-  border-radius: 7px;
-  background: var(--text);
+  border-radius: 6px;
+  background: var(--accent);
   flex: none;
 }
 .card {
@@ -380,7 +423,7 @@ input[type="checkbox"]:disabled {
   display: grid;
   gap: 16px;
   padding: 30px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
 }
 .auth p {
   margin: 0;
@@ -399,7 +442,7 @@ input[type="checkbox"]:disabled {
 /* ---------- Shell and sidebar ---------- */
 .shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
 }
 .sidebar {
@@ -407,7 +450,7 @@ input[type="checkbox"]:disabled {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 14px 10px;
+  padding: 12px 8px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -418,7 +461,7 @@ input[type="checkbox"]:disabled {
   gap: 9px;
   font-weight: 600;
   font-size: 14px;
-  padding: 0 8px 18px;
+  padding: 4px 8px 16px;
   letter-spacing: -0.01em;
 }
 .nav-head {
@@ -441,8 +484,8 @@ input[type="checkbox"]:disabled {
   gap: 9px;
   width: 100%;
   text-align: left;
-  height: 30px;
-  padding: 0 10px;
+  height: 28px;
+  padding: 0 8px;
   border: 0;
   border-radius: var(--radius);
   background: none;
@@ -466,6 +509,7 @@ input[type="checkbox"]:disabled {
 }
 .nav-item.on {
   background: var(--active);
+  font-weight: 600;
   color: var(--text);
 }
 .nav-item.on .icon {
@@ -520,21 +564,24 @@ input[type="checkbox"]:disabled {
 
 /* ---------- Page ---------- */
 .main {
-  padding: 24px 32px 48px;
+  padding: 16px 24px 40px;
   min-width: 0;
 }
 .head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.head h1 {
+  font-size: 15px;
+  letter-spacing: -0.01em;
 }
 .tbl-ico {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--border-strong);
-  background: var(--surface);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  background: var(--hover);
   color: var(--text-2);
   display: grid;
   place-items: center;
@@ -715,13 +762,13 @@ input[type="checkbox"]:disabled {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--surface-2);
+  background: var(--surface);
   text-align: left;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-3);
-  padding: 0 12px;
-  height: 34px;
+  padding: 0 8px;
+  height: 32px;
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
   white-space: nowrap;
@@ -747,7 +794,7 @@ input[type="checkbox"]:disabled {
   border-right: 1px solid var(--border);
   padding: 0;
   max-width: 340px;
-  height: 36px;
+  height: 32px;
 }
 .grid tbody tr:last-child td {
   border-bottom: 0;
@@ -756,7 +803,7 @@ input[type="checkbox"]:disabled {
   background: var(--hover);
 }
 .cell {
-  padding: 0 12px !important;
+  padding: 0 8px !important;
   cursor: text;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -803,7 +850,7 @@ input[type="checkbox"]:disabled {
   text-align: left;
   color: var(--text-3);
   font-size: 11.5px;
-  padding: 0 0 0 12px !important;
+  padding: 0 0 0 10px !important;
   white-space: nowrap;
 }
 .rownum input[type="checkbox"] {
@@ -911,7 +958,7 @@ input[type="checkbox"]:disabled {
   padding-bottom: 14px;
 }
 .column {
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   width: 264px;
@@ -980,7 +1027,7 @@ input[type="checkbox"]:disabled {
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--veil);
   display: grid;
   place-items: center;
   z-index: 50;

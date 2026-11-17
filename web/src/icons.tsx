@@ -122,11 +122,9 @@ export const typeIcon = (t: FieldType): IconName => TYPE_ICONS[t];
 export function Logo({ size = 28 }: { size?: number }) {
   return (
     <span className="logo" style={{ width: size, height: size }} aria-hidden="true">
-      <svg width={size * 0.58} height={size * 0.58} viewBox="0 0 24 24" fill="none" stroke="#0c0c0e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="7.5" height="7.5" rx="1.8" />
-        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8" />
-        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8" />
-        <path d="M17.2 13.5v7.5M13.5 17.2H21" />
+      <svg width={size * 0.72} height={size * 0.72} viewBox="0 0 32 32" fill="none">
+        <path d="M21.5 11.2A7.2 7.2 0 1 0 21.5 20.8" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" />
+        <circle cx="22" cy="16" r="2.3" fill="#fff" />
       </svg>
     </span>
   );
