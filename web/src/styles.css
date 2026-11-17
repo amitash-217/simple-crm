@@ -798,16 +798,25 @@ input[type="checkbox"]:disabled {
   animation: pop 0.1s ease-out;
 }
 .rownum {
-  width: 44px;
-  min-width: 44px;
-  text-align: center;
+  width: 76px;
+  min-width: 76px;
+  text-align: left;
   color: var(--text-3);
   font-size: 11.5px;
-  padding: 0 !important;
+  padding: 0 0 0 12px !important;
+  white-space: nowrap;
+}
+.rownum input[type="checkbox"] {
+  vertical-align: middle;
+  margin: 0 8px 0 0;
+}
+.grid tr.selected td {
+  background: var(--accent-soft);
 }
 .rownum .open {
   display: none;
-  margin: auto;
+  margin: 0;
+  vertical-align: middle;
 }
 .grid tr:hover .rownum .n {
   display: none;

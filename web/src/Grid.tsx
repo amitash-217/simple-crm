@@ -184,6 +184,9 @@ interface GridProps {
   onAddField: () => void;
   /** Called when a column header is dropped on another: move `from` to `to`'s place. */
   onMoveField: (from: string, to: string) => void;
+  /** IDs of the rows ticked for a bulk action. */
+  selected: Set<string>;
+  onSelect: (ids: string[], on: boolean) => void;
   hasMore: boolean;
   onMore: () => void;
   loading: boolean;
@@ -195,13 +198,22 @@ export function Grid(p: GridProps) {
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const first = p.loading && p.records.length === 0;
+  const allSelected = p.records.every((r) => p.selected.has(r.id));
   const sortDir = (f: Field) => (p.sort[0]?.field === f.id ? p.sort[0].dir : null);
   return (
     <div className="grid-wrap">
       <table className="grid">
         <thead>
           <tr>
-            <th className="rownum" />
+            <th className="rownum">
+              <input
+                type="checkbox"
+                aria-label="Select all records"
+                disabled={p.records.length === 0}
+                checked={p.records.length > 0 && allSelected}
+                onChange={(e) => p.onSelect(p.records.map((r) => r.id), e.target.checked)}
+              />
+            </th>
             {p.fields.map((f) => (
               <th
                 key={f.id}
@@ -264,8 +276,9 @@ export function Grid(p: GridProps) {
               </tr>
             ))}
           {p.records.map((rec, i) => (
-            <tr key={rec.id}>
+            <tr key={rec.id} className={p.selected.has(rec.id) ? "selected" : undefined}>
               <td className="rownum">
+                <input type="checkbox" aria-label={`Select record ${i + 1}`} checked={p.selected.has(rec.id)} onChange={(e) => p.onSelect([rec.id], e.target.checked)} />
                 <span className="n">{i + 1}</span>
                 <button className="btn ghost icon-only small open" onClick={() => p.onOpen(rec)} title="Open record" aria-label="Open record">
                   <Icon name="expand" size={14} />

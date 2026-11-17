@@ -103,6 +103,8 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
   const [viewDlg, setViewDlg] = useState(false);
 
   const { confirm, prompt, toast } = useDialogs();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  useEffect(() => setSelected(new Set()), [tableId]);
   const base = `/api/tables/${encodeURIComponent(tableId)}`;
   const view = views.find((v) => v.id === viewId) ?? null;
   const isKanban = view?.kind === "kanban";
@@ -173,6 +175,19 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
       if (field.is_primary) clearLabelCache();
       // Linking a record can take it from another row, so refetch the rows.
       if (field.type === "relation") rows.reload();
+    });
+
+  const deleteSelected = () =>
+    run(async () => {
+      const ids = rows.records.filter((r) => selected.has(r.id)).map((r) => r.id);
+      const n = ids.length;
+      const ok = await confirm({ title: `Delete ${n} record${n === 1 ? "" : "s"}?`, message: "This cannot be undone.", confirmLabel: `Delete ${n} record${n === 1 ? "" : "s"}`, danger: true });
+      if (!ok) return;
+      const results = await Promise.allSettled(ids.map((id) => api.del(`${base}/records/${id}`)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      setSelected(new Set());
+      rows.reload();
+      if (failed) toast(`${failed} of ${n} records could not be deleted.`);
     });
 
   const moveCard = (rec: Rec, label: string | null) => {
@@ -347,6 +362,17 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
           </div>
         </Popover>
         <span className="spacer" />
+        {selected.size > 0 && !isKanban && (
+          <>
+            <span className="muted">{selected.size} selected</span>
+            <button className="btn" onClick={() => setSelected(new Set())}>
+              Clear
+            </button>
+            <button className="btn danger-solid" onClick={deleteSelected}>
+              <Icon name="trash" size={15} /> Delete
+            </button>
+          </>
+        )}
         {dirty && view && (
           <>
             <button className="btn" onClick={() => setCfg(view.config)}>
@@ -403,6 +429,14 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
           <Grid
             fields={visible}
             records={rows.records}
+            selected={selected}
+            onSelect={(ids, on) =>
+              setSelected((s) => {
+                const n = new Set(s);
+                ids.forEach((id) => (on ? n.add(id) : n.delete(id)));
+                return n;
+              })
+            }
             onSave={saveCell}
             onOpen={(rec) => setModal({ rec })}
             onAdd={() => setModal({ rec: null })}
