@@ -149,6 +149,7 @@ Records:
 
 - `GET /api/tables/{table}/records` with `q` (full-text), `filter`, `sort`, `limit`, `cursor` query parameters
 - `GET /api/search`, full-text search across all tables
+- `POST /api/tables/{table}/records/search` with a JSON body `{q, filter, sort, limit, cursor}`, all optional. It returns the same `{records, next_cursor}` as the list endpoint, with `filter` and `sort` as JSON values instead of strings.
 - `POST /api/tables/{table}/records`
 - `GET/PATCH/DELETE /api/tables/{table}/records/{id}`
 

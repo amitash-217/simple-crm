@@ -1,7 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use serde::Deserialize;
@@ -17,6 +17,7 @@ use crate::{
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/{table}/records", get(list).post(create))
+        .route("/{table}/records/search", post(search))
         .route("/{table}/records/{id}", get(show).patch(update).delete(remove))
 }
 
@@ -29,6 +30,17 @@ struct ListQuery {
     filter: Option<String>,
     /// JSON array of `{field, dir}`.
     sort: Option<String>,
+    limit: Option<usize>,
+    cursor: Option<String>,
+}
+
+/// The same options as `ListQuery`, but `filter` and `sort` are JSON values, not strings.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchBody {
+    q: Option<String>,
+    filter: Option<Value>,
+    sort: Option<Value>,
     limit: Option<usize>,
     cursor: Option<String>,
 }
@@ -47,22 +59,43 @@ fn parse_json(name: &str, raw: Option<String>) -> Result<Option<Value>, AppError
     .transpose()
 }
 
+fn checked_limit(limit: Option<usize>) -> Result<usize, AppError> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT);
+    if !(1..=MAX_LIMIT).contains(&limit) {
+        return Err(AppError::BadRequest(format!("limit must be between 1 and {MAX_LIMIT}")));
+    }
+    Ok(limit)
+}
+
 async fn list(
     _: AuthUser,
     State(state): State<AppState>,
     Path(table): Path<String>,
     ApiQuery(query): ApiQuery<ListQuery>,
 ) -> Result<Json<RecordList>, AppError> {
-    let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
-    if !(1..=MAX_LIMIT).contains(&limit) {
-        return Err(AppError::BadRequest(format!("limit must be between 1 and {MAX_LIMIT}")));
-    }
     let params = ListParams {
         q: query.q,
         filter: parse_json("filter", query.filter)?,
         sort: parse_json("sort", query.sort)?,
-        limit,
+        limit: checked_limit(query.limit)?,
         cursor: query.cursor,
+    };
+    Ok(Json(state.db.read(move |c| records::list(c, &table, params)).await?))
+}
+
+/// POST /records/search: the filter and sort travel as a JSON body, so a big filter is not squeezed into a URL.
+async fn search(
+    _: AuthUser,
+    State(state): State<AppState>,
+    Path(table): Path<String>,
+    ApiJson(body): ApiJson<SearchBody>,
+) -> Result<Json<RecordList>, AppError> {
+    let params = ListParams {
+        q: body.q,
+        filter: body.filter,
+        sort: body.sort,
+        limit: checked_limit(body.limit)?,
+        cursor: body.cursor,
     };
     Ok(Json(state.db.read(move |c| records::list(c, &table, params)).await?))
 }

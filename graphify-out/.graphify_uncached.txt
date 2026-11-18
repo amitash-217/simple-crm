@@ -1,5 +1,0 @@
-/Users/amitash/crm-p/DESIGN.md
-/Users/amitash/crm-p/README.md
-/Users/amitash/crm-p/docs/LINUX.md
-/Users/amitash/crm-p/session.txt
-/Users/amitash/crm-p/web/index.html

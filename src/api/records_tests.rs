@@ -472,3 +472,23 @@ async fn api_keys_can_use_records() {
     assert_eq!(created.status, StatusCode::CREATED);
     assert!(created.body["created_by"].is_string());
 }
+
+#[tokio::test]
+async fn post_search_matches_the_list_endpoint() {
+    let env = seeded().await;
+    let filter = cond("Amount", "gt", json!(0));
+    let sort = json!([{ "field": "Name", "dir": "desc" }]);
+    let listed = env.list(Some(filter.clone()), Some(sort.clone()), Some(2), None).await;
+    let posted = env
+        .post("/api/tables/Deals/records/search", json!({ "filter": filter, "sort": sort, "limit": 2 }))
+        .await;
+    assert_eq!(posted.status, StatusCode::OK, "{}", posted.body);
+    assert_eq!(posted.body, listed.body);
+    // An empty body lists everything, and a bad filter is a 400 like on GET.
+    let all = env.post("/api/tables/Deals/records/search", json!({})).await;
+    assert_eq!(all.status, StatusCode::OK);
+    let bad = env.post("/api/tables/Deals/records/search", json!({ "filter": cond("Nope", "eq", json!(1)) })).await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    let limit = env.post("/api/tables/Deals/records/search", json!({ "limit": 0 })).await;
+    assert_eq!(limit.status, StatusCode::BAD_REQUEST);
+}

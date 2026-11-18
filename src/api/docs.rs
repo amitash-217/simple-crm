@@ -106,6 +106,7 @@ mod tests {
         "delete /api/tables/{table}/fields/{field}",
         "get /api/tables/{table}/records",
         "post /api/tables/{table}/records",
+        "post /api/tables/{table}/records/search",
         "get /api/tables/{table}/records/{id}",
         "patch /api/tables/{table}/records/{id}",
         "delete /api/tables/{table}/records/{id}",
