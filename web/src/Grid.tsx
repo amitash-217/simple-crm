@@ -313,7 +313,8 @@ export function Grid(p: GridProps) {
                   type="checkbox"
                   aria-label={`Select record ${i + 1}`}
                   checked={p.selected.has(rec.id)}
-                  onChange={(e) => p.onSelect([rec.id], e.target.checked)}
+                  // A checkbox change rides on the click event: skip pointer clicks, the press already toggled it.
+                  onChange={(e) => (e.nativeEvent as MouseEvent).detail === 0 && p.onSelect([rec.id], e.target.checked)}
                   onPointerDown={(e) => {
                     if (e.button !== 0) return;
                     // No text selection while dragging across rows.
@@ -321,7 +322,7 @@ export function Grid(p: GridProps) {
                     sweep.current = { on: !p.selected.has(rec.id), last: i };
                     p.onSelect([rec.id], sweep.current.on);
                   }}
-                  // A pointer click was handled on press; only a keyboard toggle (detail 0) goes through onChange.
+                  // Keep the box as the press left it.
                   onClick={(e) => e.detail > 0 && e.preventDefault()}
                 />
                 <span className="n">{i + 1}</span>
