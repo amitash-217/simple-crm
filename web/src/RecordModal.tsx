@@ -121,7 +121,7 @@ export function RecordModal({ table, record, initial, onClose, onSaved, onChange
 
   return (
     <Drawer title={title} chip={title.charAt(0).toUpperCase()} actions={actions} onClose={close}>
-      <form className="rec-form" onSubmit={create}>
+      <form className={`rec-form${record ? "" : " fresh"}`} onSubmit={create}>
         <div className="rec-fields">
           {table.fields.map((f) => (
             <div key={f.id} className="rec-row">

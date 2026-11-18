@@ -1114,7 +1114,7 @@ input[type="checkbox"]:disabled {
   align-items: center;
   gap: 8px;
   height: 52px;
-  padding: 0 12px 0 20px;
+  padding: 0 16px 0 24px;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -1141,14 +1141,21 @@ input[type="checkbox"]:disabled {
   flex: none;
 }
 .rec-form {
-  padding: 12px 12px 24px;
+  padding: 16px 16px 24px;
+}
+.rec-fields {
+  display: grid;
+  gap: 4px;
+}
+/* Bordered inputs in a new record need a little more air between rows. */
+.rec-form.fresh .rec-fields {
+  gap: 8px;
 }
 .rec-row {
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr);
+  grid-template-columns: 128px minmax(0, 1fr);
   align-items: start;
-  gap: 8px;
-  padding: 2px 0;
+  gap: 12px;
 }
 .rec-label {
   display: flex;
@@ -1167,6 +1174,13 @@ input[type="checkbox"]:disabled {
   flex: none;
 }
 .rec-value {
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.rec-value > * {
+  flex: 1;
   min-width: 0;
 }
 .rec-value input:not([type="checkbox"]),
@@ -1188,15 +1202,21 @@ input[type="checkbox"]:disabled {
   background: var(--surface);
   border-color: var(--accent);
 }
-.rec-form .error,
+.rec-form .error {
+  margin: 16px 0 0;
+}
 .rec-form .actions {
-  margin: 12px 8px 0;
+  margin: 24px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .rec-meta {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin: 16px 8px 0;
+  margin: 24px 8px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
   font-size: 12px;
   color: var(--text-3);
 }
@@ -2017,4 +2037,28 @@ html.theming * {
 }
 .card-stack span:nth-child(2) {
   transform: translate(12px, 0) rotate(6deg);
+}
+
+/* ---------- New record pane: show every input before it is clicked ---------- */
+.rec-form.fresh .rec-value input:not([type="checkbox"]),
+.rec-form.fresh .rec-value textarea,
+.rec-form.fresh .rec-value .select-btn {
+  background: var(--inset);
+  border-color: var(--border-strong);
+}
+.rec-form.fresh .rec-value input:not([type="checkbox"]):hover,
+.rec-form.fresh .rec-value textarea:hover,
+.rec-form.fresh .rec-value .select-btn:hover {
+  border-color: var(--border-hover);
+}
+.rec-form.fresh .rec-value input:not([type="checkbox"]):focus,
+.rec-form.fresh .rec-value textarea:focus,
+.rec-form.fresh .rec-value .select-btn:focus-visible,
+.rec-form.fresh .rec-value .select-btn[aria-expanded="true"] {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+/* Borderless inputs keep their 12px text inset; chips start on the same line as the text. */
+.rec-form:not(.fresh) .rec-value > .chips {
+  padding-left: 12px;
 }

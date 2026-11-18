@@ -205,6 +205,27 @@ export function Grid(p: GridProps) {
     if (p.records.length > 0 || known.current) known.current = new Set(p.records.map((x) => x.id));
   });
   const allSelected = p.records.every((r) => p.selected.has(r.id));
+  // While a checkbox drag is under way: the state rows take, and the last row painted.
+  const sweep = useRef<{ on: boolean; last: number } | null>(null);
+  const paint = (i: number, buttons: number) => {
+    const s = sweep.current;
+    if (!s) return;
+    // The button was released outside the window: the drag is over.
+    if (!(buttons & 1)) {
+      sweep.current = null;
+      return;
+    }
+    // A fast pointer can skip rows; fill every row between the last one and this one.
+    const [a, b] = s.last < i ? [s.last, i] : [i, s.last];
+    const ids = p.records.slice(a, b + 1).map((r) => r.id).filter((id) => p.selected.has(id) !== s.on);
+    if (ids.length) p.onSelect(ids, s.on);
+    s.last = i;
+  };
+  useEffect(() => {
+    const end = () => (sweep.current = null);
+    document.addEventListener("pointerup", end);
+    return () => document.removeEventListener("pointerup", end);
+  }, []);
   const sortDir = (f: Field) => (p.sort[0]?.field === f.id ? p.sort[0].dir : null);
   return (
     <div className="grid-wrap">
@@ -282,9 +303,27 @@ export function Grid(p: GridProps) {
               </tr>
             ))}
           {p.records.map((rec, i) => (
-            <tr key={rec.id} className={`${p.selected.has(rec.id) ? "selected" : ""}${fresh.has(rec.id) ? " row-new" : ""}` || undefined}>
+            <tr
+              key={rec.id}
+              className={`${p.selected.has(rec.id) ? "selected" : ""}${fresh.has(rec.id) ? " row-new" : ""}` || undefined}
+              onPointerEnter={(e) => paint(i, e.buttons)}
+            >
               <td className="rownum">
-                <input type="checkbox" aria-label={`Select record ${i + 1}`} checked={p.selected.has(rec.id)} onChange={(e) => p.onSelect([rec.id], e.target.checked)} />
+                <input
+                  type="checkbox"
+                  aria-label={`Select record ${i + 1}`}
+                  checked={p.selected.has(rec.id)}
+                  onChange={(e) => p.onSelect([rec.id], e.target.checked)}
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    // No text selection while dragging across rows.
+                    e.preventDefault();
+                    sweep.current = { on: !p.selected.has(rec.id), last: i };
+                    p.onSelect([rec.id], sweep.current.on);
+                  }}
+                  // A pointer click was handled on press; only a keyboard toggle (detail 0) goes through onChange.
+                  onClick={(e) => e.detail > 0 && e.preventDefault()}
+                />
                 <span className="n">{i + 1}</span>
                 <button className="btn ghost icon-only small open" onClick={() => p.onOpen(rec)} title="Open record" aria-label="Open record">
                   <Icon name="expand" size={16} />
