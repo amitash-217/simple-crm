@@ -898,7 +898,7 @@
         "tags": [
           "Tables"
         ],
-        "summary": "Rename a table",
+        "summary": "Update a table",
         "parameters": [
           {
             "name": "table",
@@ -916,14 +916,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TableName"
+                "$ref": "#/components/schemas/TablePatch"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Renamed.",
+            "description": "Updated.",
             "content": {
               "application/json": {
                 "schema": {
@@ -972,7 +972,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Changes the name, colour or icon. Fields left out stay as they are."
       },
       "delete": {
         "tags": [
@@ -2551,6 +2552,16 @@
           },
           "created_at": {
             "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true,
+            "description": "Colour name: blue, green, amber, red, purple, teal, pink or gray. Null uses a colour picked from the table ID."
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true,
+            "description": "Icon name shown instead of the table's first letter. Null shows the letter."
           }
         }
       },
@@ -2853,6 +2864,30 @@
             "type": "string",
             "nullable": true
           }
+        }
+      },
+      "TablePatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "color": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Colour name, or an empty string to clear it."
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Icon name, or an empty string to clear it."
+          }
+        },
+        "example": {
+          "color": "green",
+          "icon": "star"
         }
       }
     },

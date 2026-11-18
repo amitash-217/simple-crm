@@ -7,8 +7,9 @@ import { Kanban } from "./Kanban";
 import { clearLabelCache } from "./labels";
 import { RecordModal } from "./RecordModal";
 import type { Field, Rec, Table, TableDetail, View, ViewConfig } from "./types";
-import { Icon, typeIcon } from "./icons";
-import { ErrorText, Modal, Popover, toneOf, useDialogs } from "./ui";
+import { Icon, TABLE_ICONS, typeIcon } from "./icons";
+import { ErrorText, Modal, Popover, TableTile, tableTone, useDialogs } from "./ui";
+import { TONE_NAMES } from "./FieldInput";
 import { Select } from "./Pickers";
 
 /** A config reduced to what the API stores, so two configs compare equal when they mean the same. */
@@ -248,6 +249,14 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
       }
     });
 
+  // An empty string clears the colour or icon.
+  const styleTable = (patch: { color?: string; icon?: string }) =>
+    run(async () => {
+      await api.patch(base, patch);
+      onTablesChanged();
+      await load();
+    });
+
   const deleteTable = () =>
     run(async () => {
       const ok = await confirm({ title: `Delete the table “${table.name}”?`, message: "Its records and views become unavailable.", confirmLabel: "Delete table", danger: true });
@@ -272,9 +281,9 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
   return (
     // The table's colour, for its tile, the active tab and the record drawer.
-    <div className="main" style={{ "--table": `var(--t${toneOf(tableId)})` } as React.CSSProperties}>
+    <div className="main" style={{ "--table": `var(--t${tableTone(table)})` } as React.CSSProperties}>
       <div className="head">
-        <span className="tile large">{table.name.trim().charAt(0).toUpperCase()}</span>
+        <TableTile table={table} large />
         <div>
           <h1>{table.name}</h1>
           <div className="subtitle">
@@ -285,6 +294,24 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
         <span className="spacer" />
         <Popover icon="more" title="Table options" align="right">
           <div className="menu">
+            <div className="menu-label">Colour</div>
+            <div className="table-swatches" role="group" aria-label="Table colour">
+              {TONE_NAMES.map((c, t) => (
+                <button key={c} className={`swatch tone-${t}${tableTone(table) === t ? " on" : ""}`} aria-label={c} title={c} aria-pressed={tableTone(table) === t} onClick={() => styleTable({ color: c })} />
+              ))}
+            </div>
+            <div className="menu-label">Icon</div>
+            <div className="icon-grid" role="group" aria-label="Table icon">
+              <button className={`btn ghost icon-only${table.icon ? "" : " on"}`} title="First letter" aria-label="First letter" aria-pressed={!table.icon} onClick={() => styleTable({ icon: "" })}>
+                {table.name.trim().charAt(0).toUpperCase()}
+              </button>
+              {TABLE_ICONS.map((i) => (
+                <button key={i} className={`btn ghost icon-only${table.icon === i ? " on" : ""}`} title={i} aria-label={i} aria-pressed={table.icon === i} onClick={() => styleTable({ icon: i })}>
+                  <Icon name={i} size={16} />
+                </button>
+              ))}
+            </div>
+            <hr />
             <button className="btn ghost" onClick={renameTable}>
               <Icon name="edit" size={16} /> Rename table
             </button>

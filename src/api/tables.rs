@@ -10,14 +10,14 @@ use serde_json::json;
 use super::{ApiJson, AppState};
 use crate::{
     auth::AuthUser,
-    catalog::{self, FieldConfig, FieldOut, FieldPatch, NewField, OptionInput, Table, TableDetail},
+    catalog::{self, FieldConfig, FieldOut, FieldPatch, NewField, OptionInput, Table, TableDetail, TablePatch},
     error::AppError,
 };
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list).post(create))
-        .route("/{table}", get(show).patch(rename).delete(remove))
+        .route("/{table}", get(show).patch(update).delete(remove))
         .route("/{table}/fields", get(list_fields).post(add_field))
         .route("/{table}/fields/{field}", patch(update_field).delete(delete_field))
         .merge(super::records::routes())
@@ -28,6 +28,14 @@ pub fn routes() -> Router<AppState> {
 #[serde(deny_unknown_fields)]
 struct TableBody {
     name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TablePatchBody {
+    name: Option<String>,
+    color: Option<String>,
+    icon: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -72,13 +80,14 @@ async fn show(
     Ok(Json(state.db.read(move |c| catalog::get_table(c, &table)).await?))
 }
 
-async fn rename(
+async fn update(
     _: AuthUser,
     State(state): State<AppState>,
     Path(table): Path<String>,
-    ApiJson(body): ApiJson<TableBody>,
+    ApiJson(body): ApiJson<TablePatchBody>,
 ) -> Result<Json<TableDetail>, AppError> {
-    Ok(Json(state.db.write(move |c| catalog::rename_table(c, &table, &body.name)).await?))
+    let patch = TablePatch { name: body.name, color: body.color, icon: body.icon };
+    Ok(Json(state.db.write(move |c| catalog::update_table(c, &table, patch)).await?))
 }
 
 async fn remove(

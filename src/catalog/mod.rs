@@ -135,6 +135,8 @@ pub struct Table {
     #[serde(skip)]
     pub sql_name: String,
     pub created_at: String,
+    pub color: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -246,15 +248,24 @@ pub(crate) fn validate_name(raw: &str, what: &str) -> Result<String, AppError> {
     Ok(name.to_string())
 }
 
+const TABLE_COLUMNS: &str = "id, name, sql_name, created_at, color, icon";
+
 fn table_from_row(r: &Row) -> rusqlite::Result<Table> {
-    Ok(Table { id: r.get(0)?, name: r.get(1)?, sql_name: r.get(2)?, created_at: r.get(3)? })
+    Ok(Table {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        sql_name: r.get(2)?,
+        created_at: r.get(3)?,
+        color: r.get(4)?,
+        icon: r.get(5)?,
+    })
 }
 
 /// Finds a live table by ID, or else by name (case-insensitive).
 pub fn resolve_table(conn: &Connection, key: &str) -> Result<Table, AppError> {
     let by_id = conn
         .query_row(
-            "SELECT id, name, sql_name, created_at FROM tables WHERE deleted_at IS NULL AND id = ?1",
+            &format!("SELECT {TABLE_COLUMNS} FROM tables WHERE deleted_at IS NULL AND id = ?1"),
             [key],
             table_from_row,
         )
@@ -263,8 +274,7 @@ pub fn resolve_table(conn: &Connection, key: &str) -> Result<Table, AppError> {
         return Ok(table);
     }
     conn.query_row(
-        "SELECT id, name, sql_name, created_at FROM tables
-         WHERE deleted_at IS NULL AND lower(name) = lower(?1)",
+        &format!("SELECT {TABLE_COLUMNS} FROM tables WHERE deleted_at IS NULL AND lower(name) = lower(?1)"),
         [key],
         table_from_row,
     )
@@ -273,9 +283,8 @@ pub fn resolve_table(conn: &Connection, key: &str) -> Result<Table, AppError> {
 }
 
 pub fn list_tables(conn: &Connection) -> Result<Vec<Table>, AppError> {
-    let mut stmt = conn.prepare(
-        "SELECT id, name, sql_name, created_at FROM tables WHERE deleted_at IS NULL ORDER BY created_at, id",
-    )?;
+    let mut stmt =
+        conn.prepare(&format!("SELECT {TABLE_COLUMNS} FROM tables WHERE deleted_at IS NULL ORDER BY created_at, id"))?;
     let rows = stmt.query_map([], table_from_row)?;
     Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
@@ -351,15 +360,33 @@ pub fn create_table(conn: &mut Connection, user_id: &str, name: &str) -> Result<
     Ok(detail)
 }
 
-/// Renames only the catalog row. The SQL table keeps its generated name.
-pub fn rename_table(conn: &mut Connection, key: &str, name: &str) -> Result<TableDetail, AppError> {
-    let name = validate_name(name, "table name")?;
+/// A change to a table's name, colour or icon. An empty colour or icon clears it.
+#[derive(Default)]
+pub struct TablePatch {
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub icon: Option<String>,
+}
+
+/// Changes only the catalog row. The SQL table keeps its generated name.
+pub fn update_table(conn: &mut Connection, key: &str, patch: TablePatch) -> Result<TableDetail, AppError> {
     let tx = conn.transaction()?;
     let table = resolve_table(&tx, key)?;
-    if table_name_taken(&tx, &name, &table.id)? {
-        return Err(AppError::Conflict(format!("a table named `{name}` already exists")));
+    if let Some(name) = patch.name {
+        let name = validate_name(&name, "table name")?;
+        if table_name_taken(&tx, &name, &table.id)? {
+            return Err(AppError::Conflict(format!("a table named `{name}` already exists")));
+        }
+        tx.execute("UPDATE tables SET name = ?1 WHERE id = ?2", params![name, table.id])?;
     }
-    tx.execute("UPDATE tables SET name = ?1 WHERE id = ?2", params![name, table.id])?;
+    for (column, value) in [("color", patch.color), ("icon", patch.icon)] {
+        let Some(value) = value else { continue };
+        if value.chars().count() > MAX_COLOR || value.chars().any(char::is_control) {
+            return Err(AppError::BadRequest(format!("table {column} must be at most {MAX_COLOR} characters")));
+        }
+        let value = Some(value).filter(|v| !v.is_empty());
+        tx.execute(&format!("UPDATE tables SET {column} = ?1 WHERE id = ?2"), params![value, table.id])?;
+    }
     let detail = get_table(&tx, &table.id)?;
     tx.commit()?;
     Ok(detail)
@@ -442,7 +469,7 @@ pub fn relation_target(conn: &Connection, field: &FieldOut) -> Result<Table, App
         .and_then(Value::as_str)
         .ok_or_else(|| AppError::Internal(format!("relation field `{}` has no target", field.name)))?;
     conn.query_row(
-        "SELECT id, name, sql_name, created_at FROM tables WHERE id = ?1 AND deleted_at IS NULL",
+        &format!("SELECT {TABLE_COLUMNS} FROM tables WHERE id = ?1 AND deleted_at IS NULL"),
         [id],
         table_from_row,
     )
@@ -1002,12 +1029,27 @@ mod tests {
     async fn rename_changes_catalog_only() {
         let (db, _dir) = db();
         let before = db.write(|c| create_table(c, "u1", "Deals")).await.unwrap();
-        let after = db.write(|c| rename_table(c, "Deals", "Opportunities")).await.unwrap();
+        let rename = TablePatch { name: Some("Opportunities".into()), ..Default::default() };
+        let after = db.write(|c| update_table(c, "Deals", rename)).await.unwrap();
 
         assert_eq!(after.table.id, before.table.id);
         assert_eq!(after.table.name, "Opportunities");
         assert_eq!(after.table.sql_name, before.table.sql_name);
         assert!(matches!(db.read(|c| resolve_table(c, "Deals")).await, Err(AppError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn table_colour_and_icon_set_and_clear() {
+        let (db, _dir) = db();
+        db.write(|c| create_table(c, "u1", "Deals")).await.unwrap();
+        let style = TablePatch { color: Some("green".into()), icon: Some("star".into()), ..Default::default() };
+        let after = db.write(|c| update_table(c, "Deals", style)).await.unwrap();
+        assert_eq!((after.table.color.as_deref(), after.table.icon.as_deref()), (Some("green"), Some("star")));
+        assert_eq!(after.table.name, "Deals");
+
+        let clear = TablePatch { icon: Some(String::new()), ..Default::default() };
+        let after = db.write(|c| update_table(c, "Deals", clear)).await.unwrap();
+        assert_eq!((after.table.color.as_deref(), after.table.icon), (Some("green"), None));
     }
 
     #[tokio::test]

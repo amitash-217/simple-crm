@@ -5,7 +5,7 @@ import { Icon, Logo } from "./icons";
 import { Settings } from "./Settings";
 import { TablePage } from "./TablePage";
 import type { Table, User } from "./types";
-import { CardStack, DialogProvider, ErrorText, initials, Modal, toneOf } from "./ui";
+import { CardStack, DialogProvider, ErrorText, initials, Modal, TableTile, tableTone, toneOf } from "./ui";
 
 /** The theme in effect: the saved choice, else the system's. */
 const currentTheme = (): "light" | "dark" => {
@@ -104,8 +104,8 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
         </div>
         <div className="nav-list">
           {tables?.map((t) => (
-            <a key={t.id} href={`#/t/${t.id}`} className={`nav-item tinted tone-${toneOf(t.id)}${t.id === tableId && !onSettings ? " on" : ""}`}>
-              <span className="tile">{t.name.trim().charAt(0).toUpperCase()}</span>
+            <a key={t.id} href={`#/t/${t.id}`} className={`nav-item tinted tone-${tableTone(t)}${t.id === tableId && !onSettings ? " on" : ""}`}>
+              <TableTile table={t} />
               <span className="nm">{t.name}</span>
             </a>
           ))}

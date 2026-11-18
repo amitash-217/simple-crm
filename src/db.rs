@@ -10,7 +10,10 @@ use rusqlite::Connection;
 
 use crate::error::AppError;
 
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("../migrations/0001_init.sql"))];
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("../migrations/0001_init.sql")),
+    (2, include_str!("../migrations/0002_table_style.sql")),
+];
 const READERS: usize = 4;
 
 /// One serialized writer plus a small pool of read connections.
@@ -135,7 +138,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(tables, 4);
-        assert_eq!(version, 1);
+        assert_eq!(version, MIGRATIONS.len() as i64);
     }
 
     #[tokio::test]

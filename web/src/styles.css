@@ -1890,6 +1890,45 @@ html.theming * {
   font-size: 10px;
 }
 
+/* ---------- Table options: colour and icon pickers ---------- */
+.menu-label {
+  padding: 8px 8px 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.table-swatches {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+.table-swatches .swatch.on,
+.table-swatches .swatch:focus-visible {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px rgb(var(--c));
+  outline: none;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 32px);
+  gap: 4px;
+  padding: 0 4px 4px;
+}
+.icon-grid .btn {
+  justify-content: center;
+  width: 32px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.icon-grid .btn.on {
+  background: var(--hover);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.menu hr {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- Welcome: the three building blocks, each in its own colour ---------- */
 .welcome ul {
   list-style: none;

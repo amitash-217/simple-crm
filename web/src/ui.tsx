@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Icon, type IconName } from "./icons";
+import { toneIndex } from "./FieldInput";
+import { Icon, TABLE_ICONS, type IconName } from "./icons";
+import type { Table } from "./types";
 
 /** A button that opens a dropdown panel. The panel closes on a click outside it or on Escape. */
 export function Popover(props: {
@@ -143,6 +145,17 @@ export const toneOf = (key: string) => {
   for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return Math.abs(h) % 7;
 };
+
+/** A table's colour index: the one chosen for it, else one picked from its ID. */
+export const tableTone = (t: Table) => toneIndex(t.color, toneOf(t.id));
+
+/** A table's tile: its icon if it has one, else its first letter. */
+export function TableTile({ table, large }: { table: Table; large?: boolean }) {
+  const icon = TABLE_ICONS.find((i) => i === table.icon);
+  return (
+    <span className={`tile${large ? " large" : ""}`}>{icon ? <Icon name={icon} size={large ? 18 : 12} /> : table.name.trim().charAt(0).toUpperCase()}</span>
+  );
+}
 
 // In-app replacements for window.confirm and window.prompt, plus toasts for errors from background actions.
 interface ConfirmOpts {

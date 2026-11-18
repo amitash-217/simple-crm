@@ -22,6 +22,10 @@ export interface Table {
   id: string;
   name: string;
   created_at: string;
+  /** A colour name from TONE_NAMES, or null for one picked from the ID. */
+  color: string | null;
+  /** An icon name from TABLE_ICONS, or null for the first letter. */
+  icon: string | null;
 }
 
 export interface TableDetail extends Table {
