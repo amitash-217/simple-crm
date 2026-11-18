@@ -1893,6 +1893,10 @@ html.theming * {
   border-radius: 5px;
   font-size: 10px;
 }
+/* Small icons on a tile need a heavier stroke to match the weight of a letter. */
+.tile .icon {
+  stroke-width: 2.25;
+}
 
 /* ---------- Table options: colour and icon pickers ---------- */
 .menu-label {
