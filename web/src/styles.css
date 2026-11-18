@@ -556,6 +556,10 @@ input[type="checkbox"]:disabled {
 .nav-item.on .icon {
   color: var(--text);
 }
+/* A table's icon sits on its coloured tile, so it takes the tile's ink like the letter does. */
+.nav-item .tile .icon {
+  color: inherit;
+}
 .nav-item.add {
   color: var(--text-3);
 }
