@@ -35,7 +35,7 @@ export function Popover(props: {
         aria-label={props.title}
         aria-expanded={open}
       >
-        {props.icon && <Icon name={props.icon} size={15} />}
+        {props.icon && <Icon name={props.icon} size={16} />}
         {props.label}
         {!!props.count && <span className="count">{props.count}</span>}
       </button>
@@ -91,7 +91,7 @@ export function Drawer(props: { title: string; chip?: string; actions?: ReactNod
           <span className="spacer" />
           {props.actions}
           <button className="btn tool icon-only" onClick={close} aria-label="Close" title="Close">
-            <Icon name="x" size={15} />
+            <Icon name="x" size={16} />
           </button>
         </div>
         {props.children}
@@ -103,16 +103,31 @@ export function Drawer(props: { title: string; chip?: string; actions?: ReactNod
 export const ErrorText =({ text }: { text: string }) =>
   text ? (
     <div className="error" role="alert">
-      <Icon name="alert" size={14} /> {text}
+      <Icon name="alert" size={16} /> {text}
     </div>
   ) : null;
 
-export function EmptyState(props: { icon: IconName; title: string; children?: ReactNode; action?: ReactNode }) {
+/** Three index cards in a loose stack, in the first three tones. */
+export function CardStack() {
+  return (
+    <span className="card-stack" aria-hidden="true">
+      <span className="tone-2" />
+      <span className="tone-1" />
+      <span className="tone-0" />
+    </span>
+  );
+}
+
+export function EmptyState(props: { icon: IconName; title: string; children?: ReactNode; action?: ReactNode; illustrated?: boolean }) {
   return (
     <div className="empty-state">
-      <span className="empty-icon">
-        <Icon name={props.icon} size={22} />
-      </span>
+      {props.illustrated ? (
+        <CardStack />
+      ) : (
+        <span className="empty-icon">
+          <Icon name={props.icon} size={16} />
+        </span>
+      )}
       <h3>{props.title}</h3>
       {props.children && <p>{props.children}</p>}
       {props.action}
@@ -121,6 +136,13 @@ export function EmptyState(props: { icon: IconName; title: string; children?: Re
 }
 
 export const initials = (email: string) => (email.trim()[0] ?? "?").toUpperCase();
+
+/** A stable colour index (0-6) for a table or a person. Grey, 7, stays for "no value". */
+export const toneOf = (key: string) => {
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return Math.abs(h) % 7;
+};
 
 // In-app replacements for window.confirm and window.prompt, plus toasts for errors from background actions.
 interface ConfirmOpts {
@@ -220,10 +242,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.kind}`}>
-            <Icon name={t.kind === "error" ? "alert" : "check"} size={15} />
+            <Icon name={t.kind === "error" ? "alert" : "check"} size={16} />
             <span>{t.text}</span>
             <button className="btn icon-only ghost" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} aria-label="Dismiss">
-              <Icon name="x" size={13} />
+              <Icon name="x" size={12} />
             </button>
           </div>
         ))}

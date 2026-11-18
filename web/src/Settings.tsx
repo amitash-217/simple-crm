@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api, errorMessage } from "./api";
 import { Icon, type IconName } from "./icons";
 import type { User } from "./types";
-import { ErrorText, initials, useDialogs } from "./ui";
+import { ErrorText, initials, toneOf, useDialogs } from "./ui";
 
 interface Key {
   id: string;
@@ -19,7 +19,7 @@ function Section(props: { icon: IconName; title: string; children: ReactNode }) 
     <section className="card section">
       <div className="section-head">
         <span className="tbl-ico">
-          <Icon name={props.icon} size={15} />
+          <Icon name={props.icon} size={16} />
         </span>
         <h2>{props.title}</h2>
       </div>
@@ -34,7 +34,7 @@ export function Settings({ user }: { user: User }) {
       <div className="head">
         <div>
           <h1>Settings</h1>
-          <div className="subtitle">Access for people and for your own code.</div>
+          <div className="subtitle">Access for people and for your own code</div>
         </div>
       </div>
       <ApiKeys />
@@ -85,7 +85,7 @@ function ApiKeys() {
             {keys.map((k) => (
               <tr key={k.id}>
                 <td>
-                  <strong style={{ fontWeight: 600 }}>{k.name}</strong>
+                  <strong style={{ fontWeight: 500 }}>{k.name}</strong>
                 </td>
                 <td className="muted">{k.last_used_at ? `Last used ${k.last_used_at.slice(0, 10)}` : "Never used"}</td>
                 <td>
@@ -103,7 +103,7 @@ function ApiKeys() {
                       load();
                     }}
                   >
-                    <Icon name="trash" size={13} /> Delete
+                    <Icon name="trash" size={16} /> Delete
                   </button>
                 </td>
               </tr>
@@ -114,7 +114,7 @@ function ApiKeys() {
       <form className="add-row" onSubmit={create}>
         <input required placeholder="Key name, for example “Zapier”" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="btn primary">
-          <Icon name="plus" size={15} /> Create key
+          <Icon name="plus" size={16} /> Create key
         </button>
       </form>
       <ErrorText text={error} />
@@ -154,7 +154,7 @@ function Users({ me }: { me: User }) {
             <tr key={u.id}>
               <td>
                 <span className="row">
-                  <span className="avatar">{initials(u.email)}</span>
+                  <span className={`avatar tone-${toneOf(u.email)}`}>{initials(u.email)}</span>
                   <span>
                     {u.email}
                     {u.id === me.id && <span className="muted"> · you</span>}
@@ -188,7 +188,7 @@ function Users({ me }: { me: User }) {
                     if (ok) act(() => api.del(`/api/users/${u.id}`));
                   }}
                 >
-                  <Icon name="trash" size={13} /> Delete
+                  <Icon name="trash" size={16} /> Delete
                 </button>
               </td>
             </tr>
@@ -213,7 +213,7 @@ function Users({ me }: { me: User }) {
           <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} /> Admin
         </label>
         <button className="btn primary">
-          <Icon name="plus" size={15} /> Add user
+          <Icon name="plus" size={16} /> Add user
         </button>
       </form>
       <ErrorText text={error} />

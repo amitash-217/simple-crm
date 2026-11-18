@@ -5,7 +5,7 @@ import { Icon, Logo } from "./icons";
 import { Settings } from "./Settings";
 import { TablePage } from "./TablePage";
 import type { Table, User } from "./types";
-import { DialogProvider, ErrorText, initials, Modal } from "./ui";
+import { CardStack, DialogProvider, ErrorText, initials, Modal, toneOf } from "./ui";
 
 /** The theme in effect: the saved choice, else the system's. */
 const currentTheme = (): "light" | "dark" => {
@@ -32,7 +32,7 @@ function ThemeToggle() {
   };
   return (
     <button className="nav-item" onClick={flip} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-      <Icon name={theme === "dark" ? "sun" : "moon"} size={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
+      <Icon name={theme === "dark" ? "sun" : "moon"} size={16} /> {theme === "dark" ? "Light mode" : "Dark mode"}
     </button>
   );
 }
@@ -104,25 +104,25 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
         </div>
         <div className="nav-list">
           {tables?.map((t) => (
-            <a key={t.id} href={`#/t/${t.id}`} className={`nav-item${t.id === tableId && !onSettings ? " on" : ""}`}>
-              <Icon name="table" size={15} />
+            <a key={t.id} href={`#/t/${t.id}`} className={`nav-item tinted tone-${toneOf(t.id)}${t.id === tableId && !onSettings ? " on" : ""}`}>
+              <span className="tile">{t.name.trim().charAt(0).toUpperCase()}</span>
               <span className="nm">{t.name}</span>
             </a>
           ))}
           <button className="nav-item add" onClick={() => setCreating(true)}>
-            <Icon name="plus" size={15} /> New table
+            <Icon name="plus" size={16} /> New table
           </button>
         </div>
         <div className="nav-foot">
           <a href="#/settings" className={`nav-item${onSettings ? " on" : ""}`}>
-            <Icon name="settings" size={15} /> Settings
+            <Icon name="settings" size={16} /> Settings
           </a>
           <ThemeToggle />
           <button className="nav-item" onClick={onLogout}>
-            <Icon name="logout" size={15} /> Sign out
+            <Icon name="logout" size={16} /> Sign out
           </button>
           <div className="who">
-            <span className="avatar">{initials(user.email)}</span>
+            <span className={`avatar tone-${toneOf(user.email)}`}>{initials(user.email)}</span>
             <span className="who-text">
               <span>{user.email}</span>
               <span>{user.is_admin ? "Admin" : "Member"}</span>
@@ -139,22 +139,22 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
           {error && <ErrorText text={error} />}
           {tables && (
             <div className="card welcome">
-              <Logo size={44} />
+              <CardStack />
               <h1>Build your workspace</h1>
               <p className="muted">There are no tables yet. You decide what to track and how.</p>
               <ul>
-                <li>
+                <li className="tone-0">
                   <strong>Tables</strong> hold your records, such as companies, deals or tickets.
                 </li>
-                <li>
+                <li className="tone-1">
                   <strong>Fields</strong> are the columns: text, numbers, dates, selects and links between tables.
                 </li>
-                <li>
+                <li className="tone-2">
                   <strong>Views</strong> save a filter and sort, as a grid or a Kanban board.
                 </li>
               </ul>
               <button className="btn primary" onClick={() => setCreating(true)}>
-                <Icon name="plus" size={15} /> Create your first table
+                <Icon name="plus" size={16} /> Create your first table
               </button>
             </div>
           )}
@@ -192,7 +192,7 @@ function NewTable({ onClose, onCreated }: { onClose: () => void; onCreated: (id:
       >
         <label>
           Name
-          <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} placeholder="Companies, Deals, Tickets…" />
+          <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} placeholder="Companies" />
         </label>
         <p className="muted" style={{ margin: 0 }}>
           A new table starts with one text field, Name. Add the rest yourself.

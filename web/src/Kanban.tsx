@@ -33,7 +33,7 @@ export function Kanban({ fields, groupField, records, onMove, onOpen, onAdd }: P
         return (
           <div
             key={col.label ?? "∅"}
-            className={`column${over === col.label ? " over" : ""}`}
+            className={`column ${col.tone}${over === col.label ? " over" : ""}`}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(col.label);
@@ -46,11 +46,12 @@ export function Kanban({ fields, groupField, records, onMove, onOpen, onAdd }: P
               if (rec && valueOf(rec) !== col.label) onMove(rec, col.label);
             }}
           >
-            <div className={`column-head ${col.tone}`}>
+            <div className="column-head">
               <span className="dot" />
               <span>{col.title}</span>
               <span className="count-pill">{cards.length}</span>
             </div>
+            {cards.length === 0 && <div className="column-empty">No records</div>}
             {cards.map((rec) => {
               const shown = extras.filter((f) => {
                 const v = rec.values[f.name];
@@ -68,8 +69,8 @@ export function Kanban({ fields, groupField, records, onMove, onOpen, onAdd }: P
                 </div>
               );
             })}
-            <button className="btn ghost add-card" onClick={() => onAdd(col.label)}>
-              <Icon name="plus" size={14} /> Add record
+            <button className="btn ghost add-card table-add" onClick={() => onAdd(col.label)}>
+              <Icon name="plus" size={16} /> Add record
             </button>
           </div>
         );

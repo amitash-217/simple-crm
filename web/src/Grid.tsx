@@ -137,30 +137,30 @@ function HeaderMenu(p: HeaderMenuProps) {
           setPos(pos ? null : { top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 220)) });
         }}
       >
-        <Icon name="chevron" size={13} />
+        <Icon name="chevron" size={16} />
       </button>
       {pos && (
         <div className="popover-panel menu fixed" style={pos}>
           <button className="btn ghost" onClick={run(p.onEdit)}>
-            <Icon name="edit" size={15} /> Edit field
+            <Icon name="edit" size={16} /> Edit field
           </button>
           {sortable && (
             <>
               <button className="btn ghost" onClick={run(() => p.onSort(p.sorted === "asc" ? null : "asc"))}>
-                <Icon name="sort" size={15} /> {p.sorted === "asc" ? "Remove sort" : "Sort ascending"}
+                <Icon name="sort" size={16} /> {p.sorted === "asc" ? "Remove sort" : "Sort ascending"}
               </button>
               <button className="btn ghost" onClick={run(() => p.onSort(p.sorted === "desc" ? null : "desc"))}>
-                <Icon name="sort" size={15} /> {p.sorted === "desc" ? "Remove sort" : "Sort descending"}
+                <Icon name="sort" size={16} /> {p.sorted === "desc" ? "Remove sort" : "Sort descending"}
               </button>
             </>
           )}
           {!p.field.is_primary && (
             <>
               <button className="btn ghost" onClick={run(p.onHide)}>
-                <Icon name="columns" size={15} /> Hide field
+                <Icon name="columns" size={16} /> Hide field
               </button>
               <button className="btn ghost danger" onClick={run(p.onDelete)}>
-                <Icon name="trash" size={15} /> Delete field
+                <Icon name="trash" size={16} /> Delete field
               </button>
             </>
           )}
@@ -247,7 +247,7 @@ export function Grid(p: GridProps) {
                 }}
               >
                 <span className="th" title={`${f.type === "multi_select" ? "multi-select" : f.type.replace("_", " ")}${f.is_primary ? "" : " · drag to move"}`}>
-                  <Icon name={typeIcon(f.type)} size={13} />
+                  <Icon name={typeIcon(f.type)} size={16} />
                   {f.name}
                   {sortDir(f) && <span className={`sort-mark ${sortDir(f)}`} aria-label={sortDir(f) === "asc" ? "sorted ascending" : "sorted descending"}><Icon name="chevron" size={12} /></span>}
                 </span>
@@ -263,7 +263,7 @@ export function Grid(p: GridProps) {
             ))}
             <th className="add-col">
               <button type="button" className="btn ghost icon-only small" onClick={p.onAddField} title="Add field" aria-label="Add field">
-                <Icon name="plus" size={15} />
+                <Icon name="plus" size={16} />
               </button>
             </th>
           </tr>
@@ -287,7 +287,7 @@ export function Grid(p: GridProps) {
                 <input type="checkbox" aria-label={`Select record ${i + 1}`} checked={p.selected.has(rec.id)} onChange={(e) => p.onSelect([rec.id], e.target.checked)} />
                 <span className="n">{i + 1}</span>
                 <button className="btn ghost icon-only small open" onClick={() => p.onOpen(rec)} title="Open record" aria-label="Open record">
-                  <Icon name="expand" size={14} />
+                  <Icon name="expand" size={16} />
                 </button>
               </td>
               {p.fields.map((f) => (
@@ -301,21 +301,22 @@ export function Grid(p: GridProps) {
       {p.records.length === 0 && !p.loading && (
         <EmptyState
           icon={p.narrowed ? "search" : "inbox"}
+          illustrated={!p.narrowed}
           title={p.narrowed ? "No records match" : "No records yet"}
           action={
             !p.narrowed && (
               <button className="btn primary" onClick={p.onAdd}>
-                <Icon name="plus" size={15} /> New record
+                <Icon name="plus" size={16} /> New record
               </button>
             )
           }
         >
-          {p.narrowed ? "Try a different search, or loosen the filter." : "Add the first record to this table."}
+          {p.narrowed ? "Try a different search, or loosen the filter" : "Add the first record to this table"}
         </EmptyState>
       )}
       <div className="grid-foot">
-        <button className="btn small" onClick={p.onAdd}>
-          <Icon name="plus" size={14} /> New record
+        <button className="btn small table-add" onClick={p.onAdd}>
+          <Icon name="plus" size={16} /> New record
         </button>
         {p.hasMore && (
           <button className="btn small" onClick={p.onMore}>

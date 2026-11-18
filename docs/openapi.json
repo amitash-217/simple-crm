@@ -2587,7 +2587,8 @@
           },
           "color": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "One of blue, green, amber, red, purple, teal, pink or gray. The web app shows any other value, or null, in a colour picked by the option's position."
           }
         }
       },
@@ -2602,7 +2603,8 @@
           },
           "color": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "One of blue, green, amber, red, purple, teal, pink or gray. The web app shows any other value, or null, in a colour picked by the option's position."
           },
           "position": {
             "type": "integer"

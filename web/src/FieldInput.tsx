@@ -5,10 +5,19 @@ import { Icon } from "./icons";
 import type { Field, Rec } from "./types";
 import { DatePicker, Select } from "./Pickers";
 
-/** A stable colour class for an option, by its place in the field's option list. */
+/** Option colour names, in the order of the tone-0 … tone-7 classes. */
+export const TONE_NAMES = ["blue", "green", "amber", "red", "purple", "teal", "pink", "gray"];
+
+/** The tone for an option: its named colour, else one picked by its place in the list. */
+export const toneIndex = (color: string | null | undefined, place: number) => {
+  const named = color ? TONE_NAMES.indexOf(color) : -1;
+  return named >= 0 ? named : place % 8;
+};
+
+/** A stable colour class for an option of a select field. */
 export function optionTone(field: Field, label: string): string {
   const i = field.options.findIndex((o) => o.label === label);
-  return `tone-${(i < 0 ? 7 : i) % 8}`;
+  return i < 0 ? "tone-7" : `tone-${toneIndex(field.options[i].color, i)}`;
 }
 
 interface InputProps {
@@ -240,7 +249,7 @@ export function RecordPicker(p: { table: string; many: boolean; chosen: string[]
           </button>
         </div>
         <div className="search-box">
-          <Icon name="search" size={15} />
+          <Icon name="search" size={16} />
           <input autoFocus type="search" aria-label="Search records" placeholder="Search records…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div className="pick-list">
@@ -289,7 +298,7 @@ export function ValueView({ field, value }: { field: Field; value: unknown }) {
   if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return null;
   switch (field.type) {
     case "boolean":
-      return value ? <Icon name="check" size={15} /> : null;
+      return value ? <Icon name="check" size={16} /> : null;
     case "select":
       return <span className={`chip ${optionTone(field, String(value))}`}>{String(value)}</span>;
     case "multi_select":
@@ -316,10 +325,15 @@ export function ValueView({ field, value }: { field: Field; value: unknown }) {
     }
     case "date": {
       const s = String(value);
-      if (!field.config.time || s.length === 10) return <span>{s.slice(0, 10)}</span>;
+      if (!field.config.time || s.length === 10) {
+        const d = new Date(`${s.slice(0, 10)}T00:00`);
+        return <span>{isNaN(d.getTime()) ? s.slice(0, 10) : d.toLocaleDateString(undefined, { dateStyle: "medium" })}</span>;
+      }
       const d = new Date(s);
       return <span>{isNaN(d.getTime()) ? s : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>;
     }
+    case "number":
+      return <span>{typeof value === "number" ? value.toLocaleString() : String(value)}</span>;
     case "email":
       return (
         <a href={`mailto:${String(value)}`} onClick={(e) => e.stopPropagation()}>

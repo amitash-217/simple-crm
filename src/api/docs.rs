@@ -30,6 +30,8 @@ const PAGE: &str = r##"<!doctype html>
   /* Swagger UI has no dark theme; invert it and rotate the hue back so colours keep their meaning. */
   .swagger-ui { filter: invert(0.9) hue-rotate(180deg); }
   .swagger-ui .topbar { display: none; }
+  /* Swagger hides the copy button until hover; keep it in view next to the dropdown arrow. */
+  .swagger-ui .opblock .opblock-summary .view-line-link.copy-to-clipboard { width: 24px; margin: 0 4px; }
 </style>
 </head>
 <body>
@@ -43,6 +45,13 @@ const PAGE: &str = r##"<!doctype html>
     persistAuthorization: true,
     docExpansion: "list",
     tryItOutEnabled: true,
+    // The summary copy button copies the bare path; give it the full URL instead.
+    plugins: [() => ({
+      wrapComponents: {
+        CopyToClipboardBtn: (Original, system) => (props) =>
+          system.React.createElement(Original, { ...props, textToCopy: location.origin + props.textToCopy }),
+      },
+    })],
   });
 </script>
 </body>

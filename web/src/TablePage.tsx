@@ -8,7 +8,7 @@ import { clearLabelCache } from "./labels";
 import { RecordModal } from "./RecordModal";
 import type { Field, Rec, Table, TableDetail, View, ViewConfig } from "./types";
 import { Icon, typeIcon } from "./icons";
-import { ErrorText, Modal, Popover, useDialogs } from "./ui";
+import { ErrorText, Modal, Popover, toneOf, useDialogs } from "./ui";
 import { Select } from "./Pickers";
 
 /** A config reduced to what the API stores, so two configs compare equal when they mean the same. */
@@ -271,11 +271,10 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
   const nRecords = rows.records.length;
 
   return (
-    <div className="main">
+    // The table's colour, for its tile, the active tab and the record drawer.
+    <div className="main" style={{ "--table": `var(--t${toneOf(tableId)})` } as React.CSSProperties}>
       <div className="head">
-        <span className="tbl-ico">
-          <Icon name="table" size={17} />
-        </span>
+        <span className="tile large">{table.name.trim().charAt(0).toUpperCase()}</span>
         <div>
           <h1>{table.name}</h1>
           <div className="subtitle">
@@ -287,10 +286,10 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
         <Popover icon="more" title="Table options" align="right">
           <div className="menu">
             <button className="btn ghost" onClick={renameTable}>
-              <Icon name="edit" size={15} /> Rename table
+              <Icon name="edit" size={16} /> Rename table
             </button>
             <button className="btn ghost danger" onClick={deleteTable}>
-              <Icon name="trash" size={15} /> Delete table
+              <Icon name="trash" size={16} /> Delete table
             </button>
           </div>
         </Popover>
@@ -298,29 +297,29 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
       <div className="tabs" role="tablist">
         <button className={`tab${!view ? " on" : ""}`} role="tab" aria-selected={!view} onClick={() => go(null)}>
-          <Icon name="list" size={14} /> All records
+          <Icon name="list" size={16} /> All records
         </button>
         {views.map((v) => (
           <button key={v.id} className={`tab${view?.id === v.id ? " on" : ""}`} role="tab" aria-selected={view?.id === v.id} onClick={() => go(v.id)}>
-            <Icon name={v.kind === "kanban" ? "board" : "table"} size={14} />
+            <Icon name={v.kind === "kanban" ? "board" : "table"} size={16} />
             {v.name}
             {v.stale && (
               <span title="Uses a deleted field" className="danger">
-                <Icon name="alert" size={13} />
+                <Icon name="alert" size={16} />
               </span>
             )}
           </button>
         ))}
         <button className="tab add" onClick={() => setViewDlg(true)}>
-          <Icon name="plus" size={14} /> View
+          <Icon name="plus" size={16} /> View
         </button>
         {view && (
           <span className="tab-actions">
             <button className="btn ghost small" onClick={renameView}>
-              <Icon name="edit" size={13} /> Rename
+              <Icon name="edit" size={16} /> Rename
             </button>
             <button className="btn ghost small danger" onClick={deleteView}>
-              <Icon name="trash" size={13} /> Delete
+              <Icon name="trash" size={16} /> Delete
             </button>
           </span>
         )}
@@ -328,7 +327,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
 
       <div className="toolbar">
         <div className="search-box">
-          <Icon name="search" size={15} />
+          <Icon name="search" size={16} />
           <input type="search" aria-label="Search records" placeholder="Search records…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Popover icon="filter" label="Filter" count={filterCount} active={filterCount > 0}>
@@ -344,21 +343,21 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
               <div className="row" key={f.id}>
                 <label className="inline grow">
                   <input type="checkbox" checked={!hidden.includes(f.id)} disabled={f.is_primary} onChange={() => toggleHidden(f)} />
-                  <Icon name={typeIcon(f.type)} size={14} />
+                  <Icon name={typeIcon(f.type)} size={16} />
                   {f.name}
                 </label>
                 <button className="btn ghost icon-only small" onClick={() => setFieldDlg({ field: f })} title={`Edit ${f.name}`} aria-label={`Edit ${f.name}`}>
-                  <Icon name="edit" size={14} />
+                  <Icon name="edit" size={16} />
                 </button>
                 {!f.is_primary && (
                   <button className="btn ghost icon-only small danger" onClick={() => deleteField(f)} title={`Delete ${f.name}`} aria-label={`Delete ${f.name}`}>
-                    <Icon name="trash" size={14} />
+                    <Icon name="trash" size={16} />
                   </button>
                 )}
               </div>
             ))}
             <button className="btn" onClick={() => setFieldDlg({})}>
-              <Icon name="plus" size={15} /> Add field
+              <Icon name="plus" size={16} /> Add field
             </button>
           </div>
         </Popover>
@@ -370,7 +369,7 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
               Clear
             </button>
             <button className="btn danger-solid" onClick={deleteSelected}>
-              <Icon name="trash" size={15} /> Delete
+              <Icon name="trash" size={16} /> Delete
             </button>
           </>
         )}
@@ -386,14 +385,14 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
         )}
         {dirty && !view && (
           <button className="btn primary" onClick={() => setViewDlg(true)}>
-            <Icon name="plus" size={15} /> Save as view
+            <Icon name="plus" size={16} /> Save as view
           </button>
         )}
       </div>
 
       {view?.stale && (
         <div className="banner warn">
-          <Icon name="alert" size={15} />
+          <Icon name="alert" size={16} />
           This view used a field or option that was deleted, so its filter and sort are switched off. Set them again and save to fix the view.
         </div>
       )}
@@ -523,7 +522,7 @@ function NewViewDialog(props: {
   return (
     <Modal title="New view" onClose={props.onClose}>
       <form className="form" onSubmit={submit}>
-        <p className="muted">The view starts with the filter, sort and hidden fields you have set now.</p>
+        <p className="muted">The view starts with the filter, sort and hidden fields you have set now</p>
         <label>
           Name
           <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} />

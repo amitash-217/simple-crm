@@ -4,6 +4,7 @@ import type { Field, FieldType, Table } from "./types";
 import { Icon } from "./icons";
 import { ErrorText, Modal } from "./ui";
 import { Select } from "./Pickers";
+import { TONE_NAMES, toneIndex } from "./FieldInput";
 
 const TYPES: { id: FieldType; label: string }[] = [
   { id: "text", label: "Text" },
@@ -21,6 +22,7 @@ const TYPES: { id: FieldType; label: string }[] = [
 interface OptionRow {
   id?: string;
   label: string;
+  color: string | null;
 }
 
 /** Types a value can be converted between. Select converts to the others, but not back. */
@@ -36,9 +38,13 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
   const [many, setMany] = useState(true);
   const [related, setRelated] = useState(true);
   const [time, setTime] = useState(!!field?.config.time);
-  const [options, setOptions] = useState<OptionRow[]>(field ? field.options.map((o) => ({ id: o.id, label: o.label })) : []);
+  const [options, setOptions] = useState<OptionRow[]>(field ? field.options.map((o) => ({ id: o.id, label: o.label, color: o.color })) : []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // The option whose colour swatches are showing.
+  const [picking, setPicking] = useState<number | null>(null);
+  // A new option takes the first colour not in use yet.
+  const nextColor = () => TONE_NAMES.slice(0, 7).find((c) => !options.some((o, i) => toneIndex(o.color, i) === TONE_NAMES.indexOf(c))) ?? TONE_NAMES[options.length % 7];
 
   const hasOptions = type === "select" || type === "multi_select";
   const canChangeType = !!field && (CONVERTIBLE.includes(field.type) || field.type === "select");
@@ -51,7 +57,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
     e.preventDefault();
     setBusy(true);
     setError("");
-    const opts = options.filter((o) => o.label.trim()).map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim() }));
+    const opts = options.filter((o) => o.label.trim()).map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim(), color: o.color }));
     try {
       if (field) {
         const settings = type === "number" ? { config: { integer } } : type === "date" ? { config: { time } } : {};
@@ -95,12 +101,12 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
           </label>
         )}
         {field && !canChangeType && (
-          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+          <p className="muted" style={{ margin: 0, fontSize: 12 }}>
             Type: {TYPES.find((t) => t.id === field.type)?.label}. Checkbox, multi-select and relation fields can&apos;t change type.
           </p>
         )}
         {typeChanged && (
-          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+          <p className="muted" style={{ margin: 0, fontSize: 12 }}>
             Existing values are converted. If any value doesn&apos;t fit the new type, nothing changes and you&apos;ll see which one.
             {field?.type === "select" && " The select's options are removed."}
           </p>
@@ -141,17 +147,43 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
           <div className="opt-list">
             <div className="label">Options</div>
             {options.map((o, i) => (
-              <div className="row" key={i}>
-                <input autoFocus={!o.id && !o.label} value={o.label} placeholder="Option" onChange={(e) => setOptions(options.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-                <button type="button" className="btn ghost icon-only" onClick={() => setOptions(options.filter((_, j) => j !== i))} aria-label="Remove option">
-                  <Icon name="x" size={15} />
-                </button>
+              <div className="opt-row" key={i}>
+                <div className="row">
+                  <button
+                    type="button"
+                    className={`swatch tone-${toneIndex(o.color, i)}`}
+                    onClick={() => setPicking(picking === i ? null : i)}
+                    aria-label={`Colour of ${o.label || "option"}`}
+                    aria-expanded={picking === i}
+                  />
+                  <input autoFocus={!o.id && !o.label} value={o.label} placeholder="Option" onChange={(e) => setOptions(options.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                  <button type="button" className="btn ghost icon-only" onClick={() => setOptions(options.filter((_, j) => j !== i))} aria-label="Remove option">
+                    <Icon name="x" size={16} />
+                  </button>
+                </div>
+                {picking === i && (
+                  <div className="swatches" role="group" aria-label="Option colour">
+                    {TONE_NAMES.map((c, t) => (
+                      <button
+                        type="button"
+                        key={c}
+                        className={`swatch tone-${t}${toneIndex(o.color, i) === t ? " on" : ""}`}
+                        aria-label={c}
+                        title={c}
+                        onClick={() => {
+                          setOptions(options.map((x, j) => (j === i ? { ...x, color: c } : x)));
+                          setPicking(null);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
-            <button type="button" className="btn small opt-add" onClick={() => setOptions([...options, { label: "" }])}>
-              <Icon name="plus" size={14} /> Add option
+            <button type="button" className="btn small opt-add" onClick={() => setOptions([...options, { label: "", color: nextColor() }])}>
+              <Icon name="plus" size={16} /> Add option
             </button>
-            {field && <p className="muted" style={{ margin: "8px 0 0", fontSize: 12.5 }}>Removing an option clears it from every record that uses it.</p>}
+            {field && <p className="muted" style={{ margin: "8px 0 0", fontSize: 12 }}>Removing an option clears it from every record that uses it</p>}
           </div>
         )}
         <ErrorText text={error} />

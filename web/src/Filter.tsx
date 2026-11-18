@@ -66,7 +66,7 @@ export function FilterEditor({ fields, filter, onChange }: { fields: Field[]; fi
   if (!parsed) {
     return (
       <div className="panel-body">
-        <p className="muted">This view uses nested filter groups, which this editor cannot show.</p>
+        <p className="muted">This view uses nested filter groups, which this editor cannot show</p>
         <button className="btn" onClick={() => onChange(undefined)}>
           Clear filter
         </button>
@@ -126,13 +126,13 @@ export function FilterEditor({ fields, filter, onChange }: { fields: Field[]; fi
             )}
             {field && !NO_VALUE.includes(r.op) && <ValueInput field={field} value={r.value} onChange={(v) => set(i, { value: v })} />}
             <button className="btn ghost icon-only" onClick={() => emit(mode, rows.filter((_, j) => j !== i))} aria-label="Remove filter">
-              <Icon name="x" size={15} />
+              <Icon name="x" size={16} />
             </button>
           </div>
         );
       })}
       <button className="btn" onClick={add}>
-        <Icon name="plus" size={15} /> Add filter
+        <Icon name="plus" size={16} /> Add filter
       </button>
     </div>
   );
@@ -208,13 +208,13 @@ export function SortEditor({ fields, sort, onChange }: { fields: Field[]; sort: 
             <option value="desc">descending</option>
           </Select>
           <button className="btn ghost icon-only" onClick={() => emit(sort.filter((_, j) => j !== i))} aria-label="Remove sort">
-            <Icon name="x" size={15} />
+            <Icon name="x" size={16} />
           </button>
         </div>
       ))}
       {sort.length < 5 && free.length > 0 && (
         <button className="btn" onClick={() => emit([...sort, { field: free[0].id, dir: "asc" }])}>
-          <Icon name="plus" size={15} /> Add sort
+          <Icon name="plus" size={16} /> Add sort
         </button>
       )}
     </div>

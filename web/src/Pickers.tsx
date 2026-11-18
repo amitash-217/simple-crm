@@ -146,7 +146,7 @@ export function Select(p: SelectProps) {
     >
       <button ref={btn} type="button" className="select-btn" autoFocus={p.autoFocus} aria-haspopup="listbox" aria-expanded={open} onClick={() => (open ? close() : show())} onKeyDown={key}>
         <span className={current?.label ? "" : "muted"}>{current?.label || "—"}</span>
-        <Icon name="chevron" size={13} />
+        <Icon name="chevron" size={16} />
       </button>
       {open && (
         // A label around the select would forward a click inside the list to the trigger and reopen it.
@@ -163,7 +163,7 @@ export function Select(p: SelectProps) {
               onClick={() => choose(o)}
             >
               <span>{o.label || "—"}</span>
-              {o.value === p.value && <Icon name="check" size={13} />}
+              {o.value === p.value && <Icon name="check" size={16} />}
             </div>
           ))}
         </div>
@@ -269,7 +269,7 @@ export function DatePicker(p: DateProps) {
     >
       <button ref={btn} type="button" className="select-btn" autoFocus={p.autoFocus} aria-haspopup="dialog" aria-expanded={open} onClick={() => (open ? close() : show())} onKeyDown={key}>
         <span className={label ? "" : "muted"}>{label || (p.time ? "Select date and time" : "Select date")}</span>
-        <Icon name="date" size={14} />
+        <Icon name="date" size={16} />
       </button>
       {open && (
         <div
@@ -284,13 +284,13 @@ export function DatePicker(p: DateProps) {
         >
           <div className="date-head">
             <button type="button" className="date-nav prev" onClick={() => shift(-1)} aria-label="Previous month">
-              <Icon name="chevron" size={14} />
+              <Icon name="chevron" size={16} />
             </button>
             <span className="date-title">
               {MONTHS[view.m]} {view.y}
             </span>
             <button type="button" className="date-nav next" onClick={() => shift(1)} aria-label="Next month">
-              <Icon name="chevron" size={14} />
+              <Icon name="chevron" size={16} />
             </button>
           </div>
           <div className="date-grid">

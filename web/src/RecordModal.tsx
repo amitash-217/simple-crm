@@ -113,7 +113,7 @@ export function RecordModal({ table, record, initial, onClose, onSaved, onChange
     <Popover icon="more" title="Record options" align="right">
       <div className="menu">
         <button className="btn ghost danger" onClick={remove}>
-          <Icon name="trash" size={15} /> Delete record
+          <Icon name="trash" size={16} /> Delete record
         </button>
       </div>
     </Popover>
@@ -126,7 +126,7 @@ export function RecordModal({ table, record, initial, onClose, onSaved, onChange
           {table.fields.map((f) => (
             <div key={f.id} className="rec-row">
               <span className="rec-label" title={f.name}>
-                <Icon name={typeIcon(f.type)} size={14} />
+                <Icon name={typeIcon(f.type)} size={16} />
                 <span>{f.name}</span>
               </span>
               <div className="rec-value">

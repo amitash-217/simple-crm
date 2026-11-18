@@ -34,13 +34,13 @@ export function Auth({ onUser }: { onUser: (u: User) => void }) {
 
   if (setup === null) return <div className="center">{error && <ErrorText text={error} />}</div>;
   return (
-    <div className="center">
-      <form className="card auth" onSubmit={submit}>
+    <div className="auth-split">
+      <form className="auth" onSubmit={submit}>
         <Logo size={36} />
         <div>
-          <h1>{setup ? "Set up your workspace" : "Welcome back"}</h1>
+          <h1>{setup ? "Set up your workspace" : "Sign in"}</h1>
           <p className="muted" style={{ marginTop: 4 }}>
-            {setup ? "Create the admin account. It can add everyone else later." : "Sign in to continue."}
+            {setup ? "Create the admin account. It can add everyone else later." : "Use the account your admin created for you"}
           </p>
         </div>
         <label>
@@ -63,6 +63,53 @@ export function Auth({ onUser }: { onUser: (u: User) => void }) {
           {setup ? "Create account" : "Sign in"}
         </button>
       </form>
+      <BoardPreview />
+    </div>
+  );
+}
+
+// Sample deals for the sign-in preview, shaped like a real board view.
+const PREVIEW: { title: string; tone: number; cards: { name: string; company: string; amount: string }[] }[] = [
+  { title: "Lead", tone: 0, cards: [{ name: "Website rebuild", company: "Northwind", amount: "$12,400" }, { name: "Annual support", company: "Halden & Co", amount: "$8,000" }] },
+  { title: "Proposal", tone: 2, cards: [{ name: "Fleet tracking", company: "Ortega Freight", amount: "$31,500" }, { name: "Onboarding pack", company: "Lumen Clinic", amount: "$4,200" }] },
+  { title: "Won", tone: 1, cards: [{ name: "Data migration", company: "Brightwater", amount: "$18,900" }] },
+];
+
+/** A static board of sample deals: what a table looks like once it is set up. */
+function BoardPreview() {
+  return (
+    <div className="auth-preview" aria-hidden="true">
+      <div className="preview-window">
+        <div className="preview-head">
+          <span className="tile tone-3">D</span>
+          Deals
+          <span className="muted">· Pipeline</span>
+        </div>
+        <div className="board">
+          {PREVIEW.map((col) => (
+            <div key={col.title} className={`column tone-${col.tone}`}>
+              <div className="column-head">
+                <span className="dot" />
+                <span>{col.title}</span>
+                <span className="count-pill">{col.cards.length}</span>
+              </div>
+              {col.cards.map((c) => (
+                <div key={c.name} className="card-item">
+                  <div className="card-title">{c.name}</div>
+                  <div className="card-line">
+                    <span className="k">Company</span>
+                    {c.company}
+                  </div>
+                  <div className="card-line">
+                    <span className="k">Amount</span>
+                    {c.amount}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
