@@ -125,6 +125,7 @@ mod tests {
         "patch /api/tables/{table}/views/{view}",
         "delete /api/tables/{table}/views/{view}",
         "get /api/search",
+        "get /api/changes",
     ];
 
     #[test]

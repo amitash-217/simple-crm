@@ -21,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
     let app = api::router(api::AppState {
         db,
         cookie_secure: config.cookie_secure,
+        changes: Default::default(),
     });
 
     let listener = tokio::net::TcpListener::bind(config.bind).await?;

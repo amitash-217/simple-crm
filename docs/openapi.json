@@ -2428,6 +2428,57 @@
           }
         }
       }
+    },
+    "/api/changes": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Wait for a change",
+        "description": "Long-poll. Every successful write (POST, PATCH or DELETE, except searches) bumps a version number. Pass the last version you saw as `since`: the call answers as soon as the version differs, or after about 25 seconds with the same version. Leave out `since` to get the current version at once. The version restarts at 0 when the server restarts.",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "example": 12
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The current version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "version": 13
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

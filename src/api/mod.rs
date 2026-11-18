@@ -14,6 +14,7 @@ use crate::{db::Db, error::AppError};
 
 mod api_keys;
 mod auth;
+mod changes;
 mod docs;
 #[cfg(test)]
 mod auth_tests;
@@ -51,6 +52,8 @@ struct Assets;
 pub struct AppState {
     pub db: Arc<Db>,
     pub cookie_secure: bool,
+    /// Bumped on every successful write; see `changes`.
+    pub changes: Arc<tokio::sync::watch::Sender<u64>>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -62,7 +65,9 @@ pub fn router(state: AppState) -> Router {
         .nest("/api/tables", tables::routes())
         .nest("/api/search", search::routes())
         .merge(docs::routes())
+        .merge(changes::routes())
         .fallback(static_files)
+        .layer(axum::middleware::from_fn_with_state(state.clone(), changes::track))
         .with_state(state)
 }
 
@@ -99,7 +104,7 @@ mod tests {
     fn app() -> (Router, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let db = Db::open(&dir.path().join("test.db")).unwrap();
-        (router(AppState { db, cookie_secure: false }), dir)
+        (router(AppState { db, cookie_secure: false, changes: Default::default() }), dir)
     }
 
     #[tokio::test]

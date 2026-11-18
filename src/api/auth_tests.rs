@@ -18,7 +18,7 @@ pub(super) struct Reply {
 pub(super) fn app() -> (Router, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let db = Db::open(&dir.path().join("test.db")).unwrap();
-    (router(AppState { db, cookie_secure: false }), dir)
+    (router(AppState { db, cookie_secure: false, changes: Default::default() }), dir)
 }
 
 /// `auth` is a full header: `("cookie", "crm_session=...")` or `("authorization", "Bearer ...")`.

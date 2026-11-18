@@ -41,9 +41,10 @@ function useRecords(tableId: string, cfg: ViewConfig, q: string, all: boolean) {
   const seq = useRef(0);
   const key = JSON.stringify([tableId, cfg.filter, cfg.sort, q, all]);
 
-  const reload = useCallback(async () => {
+  // A quiet reload keeps the current rows on screen until the new ones arrive.
+  const reload = useCallback(async (quiet = false) => {
     const mine = ++seq.current;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError("");
     try {
       let cursor: string | null = null;
@@ -91,9 +92,11 @@ interface Props {
   tables: Table[];
   navigate: (hash: string) => void;
   onTablesChanged: () => void;
+  /** Bumps when anything is written on the server. */
+  changes: number;
 }
 
-export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }: Props) {
+export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged, changes }: Props) {
   const [table, setTable] = useState<TableDetail | null>(null);
   const [views, setViews] = useState<View[]>([]);
   const [error, setError] = useState("");
@@ -138,6 +141,17 @@ export function TablePage({ tableId, viewId, tables, navigate, onTablesChanged }
     else setCfg(view.stale ? { hidden_fields: view.config.hidden_fields, field_order: view.config.field_order, group_by: view.config.group_by } : view.config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewKey]);
+
+  // A write from another tab, another user or the API: refresh what is on screen.
+  const seen = useRef(changes);
+  useEffect(() => {
+    if (changes === seen.current) return;
+    seen.current = changes;
+    clearLabelCache();
+    load();
+    rows.reload(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [changes]);
 
   const schemaChanged = async () => {
     clearLabelCache();

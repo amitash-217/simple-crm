@@ -37,6 +37,31 @@ function ThemeToggle() {
   );
 }
 
+/** Counts writes on the server, from this page, another tab or the API. Starts at 0. */
+function useChanges(): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      let since: number | undefined;
+      while (!stop) {
+        try {
+          // Long-poll: the server answers when the version moves, or after about 25 seconds.
+          const { version } = await api.get<{ version: number }>(`/api/changes${since === undefined ? "" : `?since=${since}`}`);
+          if (!stop && since !== undefined && version !== since) setN((x) => x + 1);
+          since = version;
+        } catch {
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+      }
+    })();
+    return () => {
+      stop = true;
+    };
+  }, []);
+  return n;
+}
+
 function useHash(): string {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
@@ -83,6 +108,10 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
   useEffect(() => {
     reload();
   }, [reload]);
+  const changes = useChanges();
+  useEffect(() => {
+    if (changes) reload();
+  }, [changes, reload]);
 
   const onSettings = route[0] === "settings";
   // With no table in the address, show the first one.
@@ -133,7 +162,7 @@ function Shell({ user, onLogout }: { user: User; onLogout: () => void }) {
       {onSettings ? (
         <Settings user={user} />
       ) : tableId ? (
-        <TablePage key={tableId} tableId={tableId} viewId={viewId} tables={tables ?? []} navigate={navigate} onTablesChanged={reload} />
+        <TablePage key={tableId} tableId={tableId} viewId={viewId} tables={tables ?? []} navigate={navigate} onTablesChanged={reload} changes={changes} />
       ) : (
         <div className="main">
           {error && <ErrorText text={error} />}
