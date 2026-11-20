@@ -799,6 +799,11 @@ fn convert(from: &FieldOut, to: FieldType, config: &FieldConfig, v: rusqlite::ty
     use rusqlite::types::Value as Sql;
     let text = match v {
         Sql::Null | Sql::Blob(_) => return Ok(Sql::Null),
+        // A checkbox reads as true/false, or 1/0 when it becomes a number.
+        Sql::Integer(i) if from.field_type == "boolean" => match (to, i != 0) {
+            (FieldType::Number, b) => (b as i64).to_string(),
+            (_, b) => b.to_string(),
+        },
         Sql::Integer(i) => i.to_string(),
         Sql::Real(f) => f.to_string(),
         Sql::Text(s) if from.field_type == "select" => match from.options.iter().find(|o| o.id == s) {
@@ -816,6 +821,11 @@ fn convert(from: &FieldOut, to: FieldType, config: &FieldConfig, v: rusqlite::ty
         FieldType::Phone => v::normalize_phone(&text).map(Sql::Text).map_err(|m| format!("`{text}`: {m}")),
         FieldType::Date if v::valid_date(&text) => Ok(Sql::Text(text)),
         FieldType::Date => Err(format!("`{text}` is not an ISO 8601 date")),
+        FieldType::Boolean => match text.trim().to_lowercase().as_str() {
+            "true" | "yes" | "1" => Ok(Sql::Integer(1)),
+            "false" | "no" | "0" | "" => Ok(Sql::Integer(0)),
+            _ => Err(format!("`{text}` is not true/false, yes/no or 1/0")),
+        },
         FieldType::Number => {
             let f: f64 = text.trim().parse().map_err(|_| format!("`{text}` is not a number"))?;
             if !f.is_finite() {
@@ -881,8 +891,8 @@ fn change_type(
         return Ok(());
     }
 
-    let from_ok = TEXT_LIKE.contains(&field.field_type) || matches!(field.field_type, "number" | "date" | "select");
-    let to_ok = TEXT_LIKE.contains(&to.as_str()) || matches!(to, FieldType::Number | FieldType::Date);
+    let from_ok = TEXT_LIKE.contains(&field.field_type) || matches!(field.field_type, "number" | "date" | "select" | "boolean");
+    let to_ok = TEXT_LIKE.contains(&to.as_str()) || matches!(to, FieldType::Number | FieldType::Date | FieldType::Boolean);
     if !from_ok || !to_ok {
         return Err(AppError::BadRequest(format!(
             "cannot change a {} field to {}",

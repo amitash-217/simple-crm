@@ -26,7 +26,7 @@ interface OptionRow {
 }
 
 /** Types a value can be converted between. Select converts to the others, but not back. */
-const CONVERTIBLE: FieldType[] = ["text", "long_text", "email", "phone", "number", "date"];
+const CONVERTIBLE: FieldType[] = ["text", "long_text", "email", "phone", "number", "date", "boolean"];
 
 /** Creates a field, or (with `field`) edits its name, options, settings and type. */
 export function FieldDialog(props: { tableId: string; tables: Table[]; field?: Field; onClose: () => void; onSaved: () => void }) {
@@ -102,7 +102,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
         )}
         {field && !canChangeType && (
           <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-            Type: {TYPES.find((t) => t.id === field.type)?.label}. Checkbox, multi-select and relation fields can&apos;t change type.
+            Type: {TYPES.find((t) => t.id === field.type)?.label}. Multi-select and relation fields can&apos;t change type.
           </p>
         )}
         {typeChanged && (

@@ -561,6 +561,18 @@ async fn a_field_can_change_type_when_its_values_convert() {
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
     assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], "42");
 
+    // Number to checkbox and back: 42 is not true/false, 1 is.
+    env.call(Method::PATCH, &url, Some(json!({ "type": "number" }))).await;
+    let r = env.call(Method::PATCH, &url, Some(json!({ "type": "boolean" }))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
+    env.patch("Companies", &crm.a, json!({ "Code": 1 })).await;
+    let r = env.call(Method::PATCH, &url, Some(json!({ "type": "boolean" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], json!(true));
+    let r = env.call(Method::PATCH, &url, Some(json!({ "type": "text" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(env.get("Companies", &crm.a).await["values"]["Code"], "true");
+
     // Unsupported conversions and the primary field are refused.
     let r = env.call(Method::PATCH, "/api/tables/Companies/fields/Name", Some(json!({ "type": "number" }))).await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.body);
