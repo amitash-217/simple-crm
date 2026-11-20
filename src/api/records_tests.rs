@@ -196,7 +196,9 @@ async fn empty_record_and_keys_by_field_id() {
     let env = env().await;
     let empty = env.post("/api/tables/Deals/records", json!({})).await;
     assert_eq!(empty.status, StatusCode::CREATED);
-    assert!(empty.body["values"].as_object().unwrap().values().all(Value::is_null));
+    let values = empty.body["values"].as_object().unwrap();
+    assert_eq!(values["Priority"], false, "a checkbox defaults to false");
+    assert!(values.iter().filter(|(k, _)| *k != "Priority").all(|(_, v)| v.is_null()));
 
     let fields = env.call(Method::GET, "/api/tables/Deals/fields", None).await;
     let amount_id = fields.body.as_array().unwrap().iter().find(|f| f["name"] == "Amount").unwrap()["id"].clone();

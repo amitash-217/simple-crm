@@ -35,7 +35,8 @@ function Cell({ field, value, onSave }: CellProps) {
 
   if (field.type === "boolean") {
     return (
-      <td className="cell center-cell">
+      // Clicks on the box itself toggle it through onChange.
+      <td className="cell center-cell check-cell" onClick={(e) => e.target === e.currentTarget && onSave(value !== true)}>
         <input type="checkbox" checked={value === true} onChange={(e) => onSave(e.target.checked)} />
       </td>
     );

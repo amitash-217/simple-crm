@@ -71,7 +71,7 @@ impl FieldType {
         match self {
             Self::Number if config.integer == Some(true) => "INTEGER",
             Self::Number => "REAL",
-            Self::Boolean => "INTEGER",
+            Self::Boolean => "INTEGER NOT NULL DEFAULT 0",
             Self::Text | Self::LongText | Self::Email | Self::Date | Self::Phone | Self::Select | Self::MultiSelect | Self::Relation => "TEXT",
         }
     }

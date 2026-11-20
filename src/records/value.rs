@@ -11,10 +11,10 @@ const MAX_TEXT: usize = 100_000;
 const MAX_LONG_TEXT: usize = 1_000_000;
 const MAX_LINKS: usize = 1000;
 
-/// Validates `v` for `field` and returns the value to store. JSON `null` clears the field.
+/// Validates `v` for `field` and returns the value to store. JSON `null` clears the field; a cleared checkbox is false.
 pub fn to_sql(field: &FieldOut, v: &Value) -> Result<Sql, AppError> {
     if v.is_null() {
-        return Ok(Sql::Null);
+        return Ok(if field.field_type == "boolean" { Sql::Integer(0) } else { Sql::Null });
     }
     let bad = |msg: &str| AppError::BadRequest(format!("field `{}`: {msg}", field.name));
     match field.field_type {

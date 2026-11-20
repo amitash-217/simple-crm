@@ -109,6 +109,22 @@ fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
         tx.commit()?;
         tracing::info!(version, "applied migration");
     }
+    backfill_checkboxes(conn)
+}
+
+/// Checkbox columns made before they defaulted to false may hold NULL; store false instead.
+fn backfill_checkboxes(conn: &Connection) -> rusqlite::Result<()> {
+    let columns: Vec<(String, String)> = {
+        let mut stmt = conn.prepare(
+            "SELECT t.sql_name, f.sql_name FROM fields f JOIN tables t ON t.id = f.table_id
+             WHERE f.type = 'boolean' AND f.deleted_at IS NULL AND t.deleted_at IS NULL",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<Result<_, _>>()?
+    };
+    for (t, f) in columns {
+        conn.execute(&format!("UPDATE \"{t}\" SET \"{f}\" = 0 WHERE \"{f}\" IS NULL"), [])?;
+    }
     Ok(())
 }
 

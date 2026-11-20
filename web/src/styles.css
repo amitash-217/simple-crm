@@ -860,6 +860,9 @@ input[type="checkbox"]:disabled {
 .cell input[type="checkbox"] {
   display: block;
 }
+.check-cell {
+  cursor: pointer;
+}
 .cell.editing {
   padding: 2px !important;
   overflow: visible;
