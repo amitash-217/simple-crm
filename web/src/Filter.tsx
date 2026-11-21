@@ -41,6 +41,7 @@ function opsFor(f: Field): string[] {
   if (f.type === "text" || f.type === "long_text" || f.type === "email" || f.type === "phone") return OPS.text;
   if (f.type === "multi_select" || (f.type === "relation" && (f.config.many || f.config.related))) return OPS.multi;
   if (f.type === "relation") return OPS.link;
+  if (f.type === "last_modified") return OPS.date;
   return OPS[f.type];
 }
 
@@ -144,7 +145,8 @@ function ValueInput({ field, value, onChange }: { field: Field; value: unknown; 
     case "number":
       return <input type="number" value={(value as number | undefined) ?? ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />;
     case "date":
-      return field.config.time ? (
+    case "last_modified":
+      return field.config.time || field.type === "last_modified" ? (
         <DatePicker time value={toLocalInput(value)} onChange={(v) => onChange(fromLocalInput(v) ?? undefined)} />
       ) : (
         <DatePicker value={(value as string | undefined)?.slice(0, 10) ?? ""} onChange={(v) => onChange(v || undefined)} />

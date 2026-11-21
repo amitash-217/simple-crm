@@ -87,6 +87,7 @@ Every user table has these fixed columns in addition to its user fields:
 | multi-select | join table `m_<field_id>(record_id, option_id, position)` |
 | relation (to one) | `TEXT` column holding the target record ID, `REFERENCES target(id) ON DELETE SET NULL` |
 | relation (to many) | join table `r_<field_id>(record_id, target_id, position)` |
+| last_modified | none: reads the record's `updated_at`. Read-only; writing it is a 400 |
 
 Relations are one-directional: a relation field on table A points to table B, and B gets no inverse field. A relation field's `config` is `{"table": "<target table id>", "many": false}`. A request may name the target table by name or ID, and the catalog stores the ID, so renaming the target breaks nothing. A table may relate to itself.
 
@@ -99,10 +100,10 @@ Join tables have `ON DELETE CASCADE` foreign keys on both sides, and `multi-sele
 - Rename: catalog update only.
 - Delete table or field: soft delete. Set `deleted_at` in the catalog. The SQL object and its data stay, and the API stops exposing them. An explicit purge endpoint later runs `DROP`.
 - Changing a field's type is not supported in v1. The user adds a new field and migrates data.
-- Every table starts with a primary text field named `Name`. It cannot be deleted.
+- Every table starts with a primary text field named `Name`, which cannot be deleted, and a `Last modified` field. Migration 3 added `Last modified` to tables made before it.
 - Names are unique per scope (tables, and fields within a table), compared case-insensitively among live objects. A soft-deleted name can be reused.
 - Select options are replaced as a whole through `PATCH` on the field. Entries with an `id` are kept and edited, entries without one are added, and omitted options are removed. Records that held a removed option get that field set to NULL.
-- Field types: text, number, boolean, date, phone, select, multi_select and relation. Removing a multi-select option works like removing a select option, and the links to it are removed.
+- Field types: text, number, boolean, date, phone, select, multi_select, relation and last_modified. Removing a multi-select option works like removing a select option, and the links to it are removed.
 
 SQLite runs DDL inside transactions, so a failed catalog or DDL step rolls back both.
 

@@ -36,7 +36,8 @@ pub fn to_sql(field: &FieldOut, v: &Value) -> Result<Sql, AppError> {
             let s = v.as_str().ok_or_else(|| bad("expected a string"))?;
             normalize_phone(s).map(Sql::Text).map_err(|m| bad(&m))
         }
-        "date" => {
+        // A last-modified field is never written, but filters compare it against dates.
+        "date" | "last_modified" => {
             let s = v.as_str().ok_or_else(|| bad("expected a string"))?;
             if valid_date(s) {
                 Ok(Sql::Text(s.to_string()))

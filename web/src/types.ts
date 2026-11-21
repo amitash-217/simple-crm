@@ -1,4 +1,4 @@
-export type FieldType = "text" | "number" | "boolean" | "date" | "phone" | "email" | "long_text" | "select" | "multi_select" | "relation";
+export type FieldType = "text" | "number" | "boolean" | "date" | "phone" | "email" | "long_text" | "select" | "multi_select" | "relation" | "last_modified";
 
 export interface Option {
   id: string;

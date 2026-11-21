@@ -30,6 +30,7 @@ pub enum FieldType {
     Select,
     MultiSelect,
     Relation,
+    LastModified,
 }
 
 impl FieldType {
@@ -45,8 +46,9 @@ impl FieldType {
             "select" => Ok(Self::Select),
             "multi_select" => Ok(Self::MultiSelect),
             "relation" => Ok(Self::Relation),
+            "last_modified" => Ok(Self::LastModified),
             _ => Err(AppError::BadRequest(format!(
-                "unknown field type `{s}`; expected text, number, boolean, date, phone, email, long_text, select, multi_select or relation"
+                "unknown field type `{s}`; expected text, number, boolean, date, phone, email, long_text, select, multi_select, relation or last_modified"
             ))),
         }
     }
@@ -63,6 +65,7 @@ impl FieldType {
             Self::Select => "select",
             Self::MultiSelect => "multi_select",
             Self::Relation => "relation",
+            Self::LastModified => "last_modified",
         }
     }
 
@@ -72,7 +75,7 @@ impl FieldType {
             Self::Number if config.integer == Some(true) => "INTEGER",
             Self::Number => "REAL",
             Self::Boolean => "INTEGER NOT NULL DEFAULT 0",
-            Self::Text | Self::LongText | Self::Email | Self::Date | Self::Phone | Self::Select | Self::MultiSelect | Self::Relation => "TEXT",
+            Self::Text | Self::LongText | Self::Email | Self::Date | Self::Phone | Self::Select | Self::MultiSelect | Self::Relation | Self::LastModified => "TEXT",
         }
     }
 }
@@ -202,6 +205,20 @@ impl FieldOut {
     pub fn has_column(&self) -> bool {
         !self.in_join_table()
     }
+
+    /// Set by the server, never by a request. A last-modified field shows the record's `updated_at`.
+    pub fn read_only(&self) -> bool {
+        self.field_type == "last_modified"
+    }
+
+    /// The SQL expression for this field's column, quoted.
+    pub fn column(&self) -> Result<String, AppError> {
+        if self.read_only() {
+            Ok("\"updated_at\"".to_string())
+        } else {
+            ident(&self.sql_name)
+        }
+    }
 }
 
 pub struct NewField {
@@ -314,7 +331,8 @@ fn field_name_taken(conn: &Connection, table_id: &str, name: &str, except_id: &s
     Ok(n > 0)
 }
 
-/// Creates the catalog row and the backing SQLite table, with a primary text field named `Name`.
+/// Creates the catalog row and the backing SQLite table, with a primary text field named `Name`
+/// and a `Last modified` field.
 pub fn create_table(conn: &mut Connection, user_id: &str, name: &str) -> Result<TableDetail, AppError> {
     let name = validate_name(name, "table name")?;
     let tx = conn.transaction()?;
@@ -352,6 +370,15 @@ pub fn create_table(conn: &mut Connection, user_id: &str, name: &str) -> Result<
              VALUES (?1, ?2, 'Name', ?3, 'text', '{{}}', 0, 1, {NOW})"
         ),
         params![field_id, id, field_sql],
+    )?;
+    // Reads the record's `updated_at`, so it has no column of its own.
+    let modified_id = new_id();
+    tx.execute(
+        &format!(
+            "INSERT INTO fields (id, table_id, name, sql_name, type, config_json, position, is_primary, created_at)
+             VALUES (?1, ?2, 'Last modified', ?3, 'last_modified', '{{}}', 1, 0, {NOW})"
+        ),
+        params![modified_id, id, sql_name("f", &modified_id)],
     )?;
 
     let detail = get_table(&tx, &id)?;
@@ -701,7 +728,9 @@ pub fn add_field(conn: &mut Connection, table_key: &str, new: NewField) -> Resul
     };
     let field_sql = sql_name(prefix, &id);
     let links = Links { joined, one_per_record: joined && !many, one_per_target: stored.exclusive == Some(true) };
-    create_storage(&tx, &table, &field_sql, field_type, &new.config, target.as_ref(), &links)?;
+    if field_type != FieldType::LastModified {
+        create_storage(&tx, &table, &field_sql, field_type, &new.config, target.as_ref(), &links)?;
+    }
     let config = serde_json::to_string(&stored).map_err(|e| AppError::Internal(e.to_string()))?;
     tx.execute(
         &format!(
@@ -1013,9 +1042,11 @@ mod tests {
         let detail = db.write(|c| create_table(c, "u1", "Deals")).await.unwrap();
 
         assert_eq!(detail.table.name, "Deals");
-        assert_eq!(detail.fields.len(), 1);
+        assert_eq!(detail.fields.len(), 2);
         assert_eq!(detail.fields[0].name, "Name");
         assert!(detail.fields[0].is_primary);
+        assert_eq!(detail.fields[1].name, "Last modified");
+        assert_eq!(detail.fields[1].field_type, "last_modified");
 
         let (table_sql, field_sql) = (detail.table.sql_name.clone(), detail.fields[0].sql_name.clone());
         let cols = db.read(move |c| Ok(columns(c, &table_sql))).await.unwrap();
@@ -1108,7 +1139,7 @@ mod tests {
 
         let listed = db.read(|c| list_fields(c, "Deals")).await.unwrap();
         let positions: Vec<i64> = listed.iter().map(|f| f.position).collect();
-        assert_eq!(positions, [0, 1, 2, 3, 4, 5, 6]);
+        assert_eq!(positions, [0, 1, 2, 3, 4, 5, 6, 7]);
     }
 
     #[tokio::test]
@@ -1147,7 +1178,7 @@ mod tests {
         let cols = db.read(move |c| Ok(columns(c, &table_sql))).await.unwrap();
         // 5 fixed columns, Name, and `seq`.
         assert_eq!(cols.len(), 7, "ALTER TABLE must roll back with the catalog insert");
-        assert_eq!(db.read(|c| list_fields(c, "Deals")).await.unwrap().len(), 1);
+        assert_eq!(db.read(|c| list_fields(c, "Deals")).await.unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -1246,7 +1277,7 @@ mod tests {
         assert_eq!(renamed.sql_name, amount.sql_name);
 
         db.write(|c| delete_field(c, "Deals", "Value")).await.unwrap();
-        assert_eq!(db.read(|c| list_fields(c, "Deals")).await.unwrap().len(), 1);
+        assert_eq!(db.read(|c| list_fields(c, "Deals")).await.unwrap().len(), 2);
 
         // The name is free again, and the old column is still in the table.
         db.write(|c| add_field(c, "Deals", new_field("Value", "number"))).await.unwrap();

@@ -86,6 +86,9 @@ fn assign<'a>(fields: &'a [FieldOut], values: &Map<String, Value>) -> Result<Vec
         if !seen.insert(field.id.as_str()) {
             return Err(AppError::BadRequest(format!("field `{}` is given more than once", field.name)));
         }
+        if field.read_only() {
+            return Err(AppError::BadRequest(format!("field `{}` is read-only", field.name)));
+        }
         let cell = if field.has_column() {
             Cell::Column(value::to_sql(field, v)?)
         } else {
@@ -154,7 +157,7 @@ fn write_links(tx: &Transaction, record_id: &str, assigned: &[(&FieldOut, Cell)]
 fn select_list(fields: &[FieldOut]) -> Result<String, AppError> {
     let mut cols = vec![SYSTEM_COLUMNS.to_string()];
     for f in fields.iter().filter(|f| f.has_column()) {
-        cols.push(ident(&f.sql_name)?);
+        cols.push(f.column()?);
     }
     Ok(cols.join(", "))
 }

@@ -158,7 +158,7 @@ async fn create_read_update_delete() {
     assert!(rec["created_by"].is_string());
     assert_eq!(rec["created_at"], rec["updated_at"]);
     let names: Vec<&str> = rec["values"].as_object().unwrap().keys().map(String::as_str).collect();
-    assert_eq!(names, ["Name", "Amount", "Stage", "Mobile", "Closes", "Priority", "Seats"], "values follow field order");
+    assert_eq!(names, ["Name", "Last modified", "Amount", "Stage", "Mobile", "Closes", "Priority", "Seats"], "values follow field order");
 
     let got = env.call(Method::GET, &format!("/api/tables/Deals/records/{id}"), None).await;
     assert_eq!(got.status, StatusCode::OK);
@@ -198,7 +198,8 @@ async fn empty_record_and_keys_by_field_id() {
     assert_eq!(empty.status, StatusCode::CREATED);
     let values = empty.body["values"].as_object().unwrap();
     assert_eq!(values["Priority"], false, "a checkbox defaults to false");
-    assert!(values.iter().filter(|(k, _)| *k != "Priority").all(|(_, v)| v.is_null()));
+    assert_eq!(values["Last modified"], empty.body["updated_at"]);
+    assert!(values.iter().filter(|(k, _)| !matches!(k.as_str(), "Priority" | "Last modified")).all(|(_, v)| v.is_null()));
 
     let fields = env.call(Method::GET, "/api/tables/Deals/fields", None).await;
     let amount_id = fields.body.as_array().unwrap().iter().find(|f| f["name"] == "Amount").unwrap()["id"].clone();
@@ -493,4 +494,34 @@ async fn post_search_matches_the_list_endpoint() {
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
     let limit = env.post("/api/tables/Deals/records/search", json!({ "limit": 0 })).await;
     assert_eq!(limit.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn last_modified_shows_updated_at_and_is_read_only() {
+    let env = seeded().await;
+    let list = env.list(None, Some(json!([{ "field": "Last modified", "dir": "desc" }])), None, None).await;
+    assert_eq!(list.status, StatusCode::OK, "{}", list.body);
+    let recs = list.body["records"].as_array().unwrap();
+    assert_eq!(recs.len(), 6);
+    assert!(recs.iter().all(|r| r["values"]["Last modified"] == r["updated_at"]));
+
+    assert_eq!(env.names(cond("Last modified", "gte", json!("2000-01-01"))).await.len(), 6);
+    assert_eq!(env.names(cond("Last modified", "lt", json!("2000-01-01"))).await.len(), 0);
+
+    let id = recs[0]["id"].as_str().unwrap();
+    let r = env
+        .call(Method::PATCH, &format!("/api/tables/Deals/records/{id}"), Some(json!({ "values": { "Last modified": "2001-01-01" } })))
+        .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    assert!(r.body["error"]["message"].as_str().unwrap().contains("read-only"), "{}", r.body);
+    let r = env.post("/api/tables/Deals/records", json!({ "values": { "Last modified": "2001-01-01" } })).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+
+    // Another one can be added, and it cannot change type.
+    let added = env.post("/api/tables/Deals/fields", json!({ "name": "Touched", "type": "last_modified" })).await;
+    assert_eq!(added.status, StatusCode::CREATED, "{}", added.body);
+    let r = env.call(Method::PATCH, "/api/tables/Deals/fields/Touched", Some(json!({ "type": "text" }))).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let rec = env.call(Method::GET, &format!("/api/tables/Deals/records/{id}"), None).await;
+    assert_eq!(rec.body["values"]["Touched"], rec.body["updated_at"]);
 }

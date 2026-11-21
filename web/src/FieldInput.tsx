@@ -323,6 +323,8 @@ export function ValueView({ field, value }: { field: Field; value: unknown }) {
         </span>
       );
     }
+    case "last_modified":
+      return <span>{new Date(String(value)).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>;
     case "date": {
       const s = String(value);
       if (!field.config.time || s.length === 10) {

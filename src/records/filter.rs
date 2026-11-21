@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 
 use super::{field_by_key, value};
 use crate::{
-    catalog::{ident, FieldOut},
+    catalog::FieldOut,
     error::AppError,
 };
 
@@ -71,7 +71,7 @@ fn target<'a>(fields: &'a [FieldOut], key: &str) -> Result<Target<'a>, AppError>
         "text" | "long_text" | "email" | "phone" => Kind::Text,
         "number" => Kind::Number,
         "boolean" => Kind::Bool,
-        "date" => Kind::Date,
+        "date" | "last_modified" => Kind::Date,
         "select" => Kind::Select,
         "multi_select" => Kind::Multi,
         "relation" if field.in_join_table() => Kind::Multi,
@@ -79,7 +79,7 @@ fn target<'a>(fields: &'a [FieldOut], key: &str) -> Result<Target<'a>, AppError>
         other => return Err(AppError::Internal(format!("unsupported field type `{other}`"))),
     };
     // For join-table fields, `expr` is the join table, not a column.
-    Ok(Target { expr: ident(&field.sql_name)?, kind, name: field.name.clone(), field: Some(field) })
+    Ok(Target { expr: field.column()?, kind, name: field.name.clone(), field: Some(field) })
 }
 
 /// `EXISTS (...)` over a join table, for the record being filtered (aliased `rec` in the list query).

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "./api";
-import { FieldInput } from "./FieldInput";
+import { FieldInput, ValueView } from "./FieldInput";
 import type { Rec, TableDetail } from "./types";
 import { Icon, typeIcon } from "./icons";
 import { Drawer, ErrorText, Popover, useDialogs } from "./ui";
@@ -130,7 +130,11 @@ export function RecordModal({ table, record, initial, onClose, onSaved, onChange
                 <span>{f.name}</span>
               </span>
               <div className="rec-value">
-                <FieldInput field={f} value={draft[f.id]} onChange={(v) => setDraft({ ...draft, [f.id]: v })} />
+                {f.type === "last_modified" ? (
+                  <ValueView field={f} value={record?.updated_at ?? null} />
+                ) : (
+                  <FieldInput field={f} value={draft[f.id]} onChange={(v) => setDraft({ ...draft, [f.id]: v })} />
+                )}
               </div>
             </div>
           ))}

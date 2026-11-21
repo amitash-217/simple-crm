@@ -41,6 +41,14 @@ function Cell({ field, value, onSave }: CellProps) {
       </td>
     );
   }
+  // Set by the server whenever the record changes.
+  if (field.type === "last_modified") {
+    return (
+      <td className="cell readonly">
+        <ValueView field={field} value={value} />
+      </td>
+    );
+  }
   if (!editing) {
     return (
       <td className={`cell${field.type === "number" ? " num" : ""}`} onClick={(e) => start(e.currentTarget)}>

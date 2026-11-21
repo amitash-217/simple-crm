@@ -17,6 +17,7 @@ const TYPES: { id: FieldType; label: string }[] = [
   { id: "select", label: "Select" },
   { id: "multi_select", label: "Multi-select" },
   { id: "relation", label: "Relation" },
+  { id: "last_modified", label: "Last modified" },
 ];
 
 interface OptionRow {
@@ -102,7 +103,7 @@ export function FieldDialog(props: { tableId: string; tables: Table[]; field?: F
         )}
         {field && !canChangeType && (
           <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-            Type: {TYPES.find((t) => t.id === field.type)?.label}. Multi-select and relation fields can&apos;t change type.
+            Type: {TYPES.find((t) => t.id === field.type)?.label}. Multi-select, relation and last modified fields can&apos;t change type.
           </p>
         )}
         {typeChanged && (

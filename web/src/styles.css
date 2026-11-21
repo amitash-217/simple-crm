@@ -863,6 +863,13 @@ input[type="checkbox"]:disabled {
 .check-cell {
   cursor: pointer;
 }
+.cell.readonly {
+  cursor: default;
+  color: var(--text-2);
+}
+.cell.readonly:hover {
+  box-shadow: none;
+}
 .cell.editing {
   padding: 2px !important;
   overflow: visible;

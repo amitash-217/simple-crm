@@ -483,7 +483,7 @@ async fn the_partner_field_is_optional_and_never_made_for_self_links() {
     let r = env.field("Companies", json!({ "name": "Parent", "type": "relation", "config": { "table": "Companies", "many": true } })).await;
     assert_eq!(r.status, StatusCode::CREATED, "{}", r.body);
     let fields = env.call(Method::GET, "/api/tables/Companies/fields", None).await;
-    assert_eq!(fields.body.as_array().unwrap().len(), 3);
+    assert_eq!(fields.body.as_array().unwrap().len(), 4);
 
     for config in [
         json!({ "table": "Projects", "create_related": false, "related_many": true }),

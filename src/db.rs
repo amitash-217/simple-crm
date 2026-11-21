@@ -13,6 +13,7 @@ use crate::error::AppError;
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("../migrations/0001_init.sql")),
     (2, include_str!("../migrations/0002_table_style.sql")),
+    (3, include_str!("../migrations/0003_last_modified.sql")),
 ];
 const READERS: usize = 4;
 

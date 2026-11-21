@@ -105,7 +105,7 @@ async fn field_lifecycle() {
     assert_eq!(amount.body["type"], "number");
     assert_eq!(amount.body["config"]["integer"], true);
     assert_eq!(amount.body["is_primary"], false);
-    assert_eq!(amount.body["position"], 1);
+    assert_eq!(amount.body["position"], 2, "after Name and Last modified");
     assert!(amount.body.get("sql_name").is_none());
 
     let stage = call(
@@ -128,7 +128,7 @@ async fn field_lifecycle() {
     // The table detail carries the fields in order.
     let table = call(&app, Method::GET, "/api/tables/Deals", None, auth).await;
     let names: Vec<&str> = table.body["fields"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["Name", "Amount", "Stage"]);
+    assert_eq!(names, ["Name", "Last modified", "Amount", "Stage"]);
 
     // Rename, then replace the options: keep Open, drop Won, add Lost.
     let open_id = stage.body["options"][0]["id"].as_str().unwrap();
@@ -152,7 +152,7 @@ async fn field_lifecycle() {
     let deleted = call(&app, Method::DELETE, "/api/tables/Deals/fields/Amount", None, auth).await;
     assert_eq!(deleted.status, StatusCode::OK);
     let fields = call(&app, Method::GET, "/api/tables/Deals/fields", None, auth).await;
-    assert_eq!(fields.body.as_array().unwrap().len(), 2);
+    assert_eq!(fields.body.as_array().unwrap().len(), 3);
     let gone = call(&app, Method::DELETE, "/api/tables/Deals/fields/Amount", None, auth).await;
     assert_eq!(gone.status, StatusCode::NOT_FOUND);
 }
